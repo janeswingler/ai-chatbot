@@ -6,3 +6,4 @@ pnpm-debug.log*
 .env
 .DS_Store
 .vscode/
+.idea/

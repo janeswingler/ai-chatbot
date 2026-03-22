@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI ChatBot</title>
+</head>
+
+<body>
+    <h1>Welcome to the AI ChatBot</h1>
+    <p>This chatbot responds to messages you send it via OpenAI!</p>
+    <label for="user-input">
+        <input type="text" id="user-input" placeholder="Enter your ID here...">
+    </label>
+    <button id="start-btn">Start Chat</button>
+    <script>
+        document.getElementById('start-btn').addEventListener('click', function () {
+            const id = document.getElementById('user-input').value.trim();
+            if (id) {
+                localStorage.setItem('participantID', id);
+                window.location.href = 'chat.html';
+            }
+        });
+    </script>
+</body>
+</html>
