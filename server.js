@@ -26,6 +26,15 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const Interaction = require('./models/Interaction');
+const retrievalService = require('./services/retrievalService');
+retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err)); // Initialize TF-IDF index 
+const EventLog = require('./models/EventLog'); // Import EventLog model
+const Document = require('./models/Document'); // Import Document model
+const multer = require("multer");
+const documentProcessor = require("./services/documentProcessor");
+const embeddingService = require("./services/embeddingService");
+const upload = multer({ dest: "uploads/" }); // Save uploaded files so documentProcessor.js can read them
+
 
 app.post('/submit-prompt', async (req, res) => {
   try {
@@ -45,8 +54,6 @@ app.post('/submit-prompt', async (req, res) => {
     res.status(500).json({ response: 'Error: ' + err.message });
   }
 });
-
-const EventLog = require('./models/EventLog'); // Import EventLog model
 
 app.post('/log-event', async (req, res) => {
   const { participantID, eventType, elementName, timestamp } = req.body;
@@ -69,10 +76,23 @@ app.get('/', (req, res) => {
 // Handles incoming chat messages
 app.post('/chat', async (req, res) => {
   try {
-    const { message, participantID } = req.body;
+    const { message, participantID, retrievalMethod } = req.body;
+    console.log('Chat request:', { message, participantID, retrievalMethod }); // debug
+    // Retrieve relevant chunks
+    const chunks = await retrievalService.retrieve(message, {
+      method: retrievalMethod || 'semantic',
+      topK: 3
+    });
+    const systemPrompt = chunks.length > 0
+      ? `You are a helpful assistant. Use the following context to answer the user's question:\n\n${chunks.map(c => c.chunkText).join('\n\n---\n\n')}`
+      : `You are a helpful assistant.`;
+    
     const chatResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{role: 'user', content: message}],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
       max_tokens: 100,
     });
     const botResponse = chatResponse.choices[0].message.content.trim();
@@ -84,6 +104,7 @@ app.post('/chat', async (req, res) => {
     res.json({response: botResponse});
     await interaction.save();
   } catch (err) {
+    console.error('Chat error:', err.message); // debug
     res.status(500).json({response: 'Error: ' + err.message});
   }
 });
@@ -96,6 +117,47 @@ app.post('/history', async (req, res) => {
   } catch (err) {
     res.status(500).json({ history: [] });
   }
+});
+
+
+// File upload handling
+app.post("/upload-document", upload.single("document") , async (req, res) => {
+    if (! req.file ) {
+    return res.status(400).json({ error: "No file uploaded" });
+    }
+    try {
+      const processed = await documentProcessor.processDocument(req.file); // Extract text + chunks from the file
+      const chunksWithEmbeddings = await embeddingService.generateEmbeddings(processed.chunks); // Generate embeddings for the chunks
+        await Document.create({
+            filename: req.file.originalname,
+            text: processed.fullText,
+            chunks: chunksWithEmbeddings.map((chunkObj) => ({
+                chunkIndex: chunkObj.chunkIndex,
+                text: chunkObj.text,
+                embedding: chunkObj.embedding || [] // Store embedding if available
+            })),
+            processingStatus: "completed"
+        });
+        // Rebuild TF-IDF index so new doc is immediately searchable
+        await retrievalService.rebuildIndex();
+        res.json({
+            status: "ok",
+            filename: req.file.originalname,
+            chunkCount: chunksWithEmbeddings.length
+        });
+        console.log(`Processed document: ${req.file.originalname}, chunks: ${chunksWithEmbeddings.length}`);
+    } catch (error) {
+        console.error("Error processing document:", error);
+        res.status(500).json({ error: "Failed to process document" });
+    }
+});
+
+// route that allows the frontend to display what documents exist with processing status
+app.get("/documents", async (req, res) => {
+    const docs = await Document.find({})
+    .select("_id filename processingStatus processedAt")
+    .sort({ processedAt: -1 });
+    res.json(docs);
 });
 
 // Starts server on port 3000

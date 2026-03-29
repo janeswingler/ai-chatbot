@@ -117,3 +117,49 @@ if (inputField) {
         logEvent('focus', 'User Input'));
 }
 
+// File upload handling
+uploadBtn.addEventListener("click", async () => {
+    const fileInput = document.getElementById("file-input");
+    const file = fileInput.files[0];
+    if (!file) return alert("Please select a file first.");
+    const formData = new FormData();
+    formData.append("document", file);
+    try {
+        const res = await fetch("/upload-document", {
+            method: "POST",
+            body: formData  // No Content-Type header — browser sets it automatically
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Uploaded: ${data.filename} (${data.chunkCount} chunks)`);
+            loadDocuments(); // Refresh the list
+        } else {
+            alert("Upload failed: " + data.error);
+        }
+    } catch (err) {
+        console.error("Upload error:", err);
+        alert("Upload failed.");
+    }
+});
+
+// Load and display uploaded documents
+async function loadDocuments() {
+    const response = await fetch("/documents");
+    const docs = await response.json();
+    const uploadedDocsEl = document.getElementById("uploaded-docs");
+    if (docs.length === 0) {
+        uploadedDocsEl.textContent = "No documents uploaded yet";
+        return;
+    }
+    uploadedDocsEl.innerHTML = "";
+    const list = document.createElement("ul");
+    docs.forEach(doc => {
+        const item = document.createElement("li");
+        item.textContent = `${doc.filename} — ${doc.processingStatus}`;
+        list.appendChild(item);
+    });
+    uploadedDocsEl.appendChild(list);
+}
+
+// Load documents on page load
+loadDocuments();
