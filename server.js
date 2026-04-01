@@ -77,16 +77,26 @@ app.get('/', (req, res) => {
 app.post('/chat', async (req, res) => {
   try {
     const { message, participantID, retrievalMethod } = req.body;
-    console.log('Chat request:', { message, participantID, retrievalMethod }); // debug
+
     // Retrieve relevant chunks
     const chunks = await retrievalService.retrieve(message, {
       method: retrievalMethod || 'semantic',
       topK: 3
     });
+
+    // Compute confidence metrics
+    const scores = chunks.map(c => c.score || 0);
+    const confidence = {
+      topScore: scores.length > 0 ? Math.max(...scores) : 0,
+      avgScore: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+      chunkCount: chunks.length
+    };
+
+    // Build RAG prompt
     const systemPrompt = chunks.length > 0
-      ? `You are a helpful assistant. Use the following context to answer the user's question:\n\n${chunks.map(c => c.chunkText).join('\n\n---\n\n')}`
-      : `You are a helpful assistant.`;
-    
+      ? `You are a helpful assistant. Use the following retrieved context to answer the user's question. Base your answer on this evidence.\n\nContext:\n${chunks.map((c, i) => `[${i + 1}] ${c.chunkText}`).join('\n\n')}`
+      : `You are a helpful assistant. No relevant documents were found; answer from general knowledge.`;
+
     const chatResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -95,29 +105,83 @@ app.post('/chat', async (req, res) => {
       ],
       max_tokens: 100,
     });
+
     const botResponse = chatResponse.choices[0].message.content.trim();
+
+    // Save full interaction with retrieval metadata
     const interaction = new Interaction({
-      participantID: participantID,
+      participantID,
       userInput: message,
-      botResponse: botResponse,
+      botResponse,
+      retrievalMethod: retrievalMethod || 'semantic',
+      retrievedChunks: chunks.map(c => ({
+        documentId: c.documentId,
+        documentName: c.documentName,
+        chunkIndex: c.chunkIndex,
+        chunkText: c.chunkText,
+        score: c.score
+      })),
+      confidence
     });
-    res.json({response: botResponse});
+
+    res.json({
+    response: botResponse,
+    retrievedChunks: interaction.retrievedChunks,
+    confidence: interaction.confidence,
+    retrievalMethod: interaction.retrievalMethod
+    });
     await interaction.save();
+
   } catch (err) {
-    console.error('Chat error:', err.message); // debug
-    res.status(500).json({response: 'Error: ' + err.message});
+    console.error('Chat error:', err.message);
+    res.status(500).json({ response: 'Error: ' + err.message });
   }
 });
 
-app.post('/history', async (req, res) => {
-  try {
-    const { participantID } = req.body;
-    const interactions = await Interaction.find({ participantID }).sort({ timestamp: 1 });
-    res.json({ history: interactions });
-  } catch (err) {
-    res.status(500).json({ history: [] });
-  }
-});
+// app.post('/chat', async (req, res) => {
+//   try {
+//     const { message, participantID, retrievalMethod } = req.body;
+//     console.log('Chat request:', { message, participantID, retrievalMethod }); // debug
+//     // Retrieve relevant chunks
+//     const chunks = await retrievalService.retrieve(message, {
+//       method: retrievalMethod || 'semantic',
+//       topK: 3
+//     });
+//     const systemPrompt = chunks.length > 0
+//       ? `You are a helpful assistant. Use the following context to answer the user's question:\n\n${chunks.map(c => c.chunkText).join('\n\n---\n\n')}`
+//       : `You are a helpful assistant.`;
+    
+//     const chatResponse = await openai.chat.completions.create({
+//       model: 'gpt-4o-mini',
+//       messages: [
+//         { role: 'system', content: systemPrompt },
+//         { role: 'user', content: message }
+//       ],
+//       max_tokens: 100,
+//     });
+//     const botResponse = chatResponse.choices[0].message.content.trim();
+//     const interaction = new Interaction({
+//       participantID: participantID,
+//       userInput: message,
+//       botResponse: botResponse,
+//     });
+//     res.json({response: botResponse});
+//     await interaction.save();
+//   } catch (err) {
+//     console.error('Chat error:', err.message); // debug
+//     res.status(500).json({response: 'Error: ' + err.message});
+//   }
+// });
+
+// app.post('/history', async (req, res) => {
+//   try {
+//     const { participantID } = req.body;
+//     const interactions = await Interaction.find({ participantID }).sort({ timestamp: 1 });
+//     res.json({ history: interactions });
+//   } catch (err) {
+//     res.status(500).json({ history: [] });
+//   }
+// });
 
 
 // File upload handling

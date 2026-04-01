@@ -39,13 +39,35 @@ const sendMessage = async () => {
             if (!response.ok) {
                 throw new Error('Server error');
             }
-
             const data = await response.json();
             console.log('Server response:', data);
+
+            // Bot response
             const botMsg = document.createElement("div");
             botMsg.textContent = data.response;
             messagesContainer.appendChild(botMsg);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // RAG evidence
+            if (data.retrievedChunks && data.retrievedChunks.length > 0) {
+                const evidence = document.createElement("div");
+                evidence.style.cssText = "font-size:0.8em; color:#666; border-left:3px solid #ccc; padding:6px 10px; margin:4px 0;";
+
+                const methodLabel = document.createElement("div");
+                methodLabel.style.fontWeight = "bold";
+                methodLabel.textContent = `📎 ${data.retrievalMethod} retrieval — top score: ${data.confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${data.confidence?.chunkCount ?? 0}`;
+                evidence.appendChild(methodLabel);
+
+                data.retrievedChunks.forEach((chunk, i) => {
+                    const chunkEl = document.createElement("div");
+                    chunkEl.style.marginTop = "4px";
+                    chunkEl.textContent = `[${i + 1}] (${chunk.score?.toFixed(3) ?? '?'}) ${chunk.documentName}: ${chunk.chunkText.slice(0, 100)}...`;
+                    evidence.appendChild(chunkEl);
+                });
+
+                messagesContainer.appendChild(evidence);
+            }
+
+            messagesContainer.scrollTop = messagesContainer.scrollHeight; //auto scroll
         } catch (error) {
             console.error('Failed to send message', error);
         }
