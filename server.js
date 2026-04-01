@@ -138,52 +138,6 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// app.post('/chat', async (req, res) => {
-//   try {
-//     const { message, participantID, retrievalMethod } = req.body;
-//     console.log('Chat request:', { message, participantID, retrievalMethod }); // debug
-//     // Retrieve relevant chunks
-//     const chunks = await retrievalService.retrieve(message, {
-//       method: retrievalMethod || 'semantic',
-//       topK: 3
-//     });
-//     const systemPrompt = chunks.length > 0
-//       ? `You are a helpful assistant. Use the following context to answer the user's question:\n\n${chunks.map(c => c.chunkText).join('\n\n---\n\n')}`
-//       : `You are a helpful assistant.`;
-    
-//     const chatResponse = await openai.chat.completions.create({
-//       model: 'gpt-4o-mini',
-//       messages: [
-//         { role: 'system', content: systemPrompt },
-//         { role: 'user', content: message }
-//       ],
-//       max_tokens: 100,
-//     });
-//     const botResponse = chatResponse.choices[0].message.content.trim();
-//     const interaction = new Interaction({
-//       participantID: participantID,
-//       userInput: message,
-//       botResponse: botResponse,
-//     });
-//     res.json({response: botResponse});
-//     await interaction.save();
-//   } catch (err) {
-//     console.error('Chat error:', err.message); // debug
-//     res.status(500).json({response: 'Error: ' + err.message});
-//   }
-// });
-
-// app.post('/history', async (req, res) => {
-//   try {
-//     const { participantID } = req.body;
-//     const interactions = await Interaction.find({ participantID }).sort({ timestamp: 1 });
-//     res.json({ history: interactions });
-//   } catch (err) {
-//     res.status(500).json({ history: [] });
-//   }
-// });
-
-
 // File upload handling
 app.post("/upload-document", upload.single("document") , async (req, res) => {
     if (! req.file ) {
