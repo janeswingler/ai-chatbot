@@ -3,42 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot Interface</title>
+    <title>AI ChatBot</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['\\[', '\\]'], ['$$', '$$']]
+            },
+            startup: { typeset: false }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 </head>
 <body>
     <main class="app-shell">
-        <section id="doc-panel" class="panel">
-            <h1>Document Management</h1>
-            <form id="upload-form">
-                <label class="form-label" for="file-input">Upload Document</label>
-                <input type="file" id="file-input" />
-                <button type="button" id="upload-btn">Upload</button>
-            </form>
-            <div class="uploaded-section">
-                <h2>Uploaded Documents</h2>
-                <p id="uploaded-docs" class="muted">No documents uploaded yet</p>
+
+        <aside class="sidebar">
+            <div class="sidebar__header">
+                <h2>Study Assistant</h2>
+                <p>AI-powered learning tool</p>
             </div>
-            <div class="retrieval-section">
-                <label class="form-label" for="retrieval-method">Retrieval Method</label>
-                <select id="retrieval-method">
+
+            <div class="sidebar-section">
+                <h3>Upload Document</h3>
+                <input type="file" id="file-input" aria-label="Choose a file to upload" />
+                <button type="button" id="upload-btn" class="btn-primary">Upload</button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Documents</h3>
+                <div id="uploaded-docs">No documents uploaded yet</div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Retrieval Method</h3>
+                <select id="retrieval-method" aria-label="Select retrieval method">
                     <option value="semantic">Semantic (Embeddings)</option>
                     <option value="tfidf">TF-IDF (Keyword)</option>
                 </select>
             </div>
-        </section>
+        </aside>
 
-        <section id="chat-container" class="panel">
+        <section class="chat-panel">
             <header class="chat-header">
+                <span class="status-dot" aria-hidden="true"></span>
                 <h1>AI Chat</h1>
             </header>
-            <div id="messages" class="messages" aria-live="polite"></div>
+
+            <div id="messages" class="messages" aria-live="polite" aria-label="Chat messages"></div>
+
             <form class="input-row" onsubmit="return false;">
                 <label class="sr-only" for="user-input">Type a message</label>
-                <input type="text" id="user-input" placeholder="Begin chatting..." autocomplete="off" />
-                <button type="button" id="send-btn">Send</button>
+                <input type="text" id="user-input" placeholder="Ask a question..." autocomplete="off" />
+                <button type="button" id="send-btn" class="btn-primary">Send</button>
             </form>
         </section>
+
     </main>
     <script src="script.js"></script>
 </body>

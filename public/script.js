@@ -4,21 +4,36 @@ const inputField = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 
 const messagesContainer = document.getElementById("messages");
+const retrievalMethod = document.getElementById("retrieval-method");
 
-const participantID = localStorage.getItem('participantID');
 
-// If none found, send back to index.html
+// Read the query string from the current page URL so we can extract values like participantID and systemID
+const params = new URLSearchParams(window.location.search);
+
+// Retrieve participantID and system ID from localStorage
+const participantID = params.get('participantID') || localStorage.getItem('participantID');
+const systemID = params.get('systemID');
+
+// Alert and prompt if no participantID
 if (!participantID) {
-    window.location.href = 'index.html';
+alert('Please enter a participant ID.');
+// Redirect to login if no participantID is set
+window.location.href = '/';
 }
+
+const MAX_INTERACTIONS = 5;
+const conversationHistory = [];
 
 const sendMessage = async () => {
     const message = inputField.value.trim();
     if (message !== null && message !== "") {
         const selectedMethod = retrievalMethod.value;
         const msg = document.createElement("div");
-        msg.textContent = message;
-        msg.style.textAlign = "right";
+        msg.classList.add("message", "message--user");
+        const userBubble = document.createElement("div");
+        userBubble.classList.add("message__bubble");
+        userBubble.textContent = message;
+        msg.appendChild(userBubble);
         messagesContainer.appendChild(msg);
         inputField.value = "";
         messagesContainer.scrollTop = messagesContainer.scrollHeight; //auto scroll
@@ -30,8 +45,10 @@ const sendMessage = async () => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                    history: conversationHistory.slice(-10),
+                    input: message,
                     participantID,
-                    message,
+                    systemID,
                     retrievalMethod: selectedMethod
                 })
             });
@@ -42,24 +59,39 @@ const sendMessage = async () => {
             const data = await response.json();
             console.log('Server response:', data);
 
-            // Bot response
-            const botMsg = document.createElement("div");
-            botMsg.textContent = data.response;
-            messagesContainer.appendChild(botMsg);
+            // Bot response — protect math blocks before marked processes them
+            const mathBlocks = [];
+            let protectedText = data.response
+                .replace(/\\\[[\s\S]*?\\\]/g, match => { mathBlocks.push(match); return `%%MATH${mathBlocks.length - 1}%%`; })
+                .replace(/\\\([\s\S]*?\\\)/g, match => { mathBlocks.push(match); return `%%MATH${mathBlocks.length - 1}%%`; });
+            let rendered = marked.parse(protectedText);
+            rendered = rendered.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+
+            const botWrapper = document.createElement("div");
+            botWrapper.classList.add("message", "message--bot");
+            const botBubble = document.createElement("div");
+            botBubble.classList.add("message__bubble");
+            botBubble.innerHTML = rendered;
+            botWrapper.appendChild(botBubble);
+            messagesContainer.appendChild(botWrapper);
+            MathJax.typesetPromise([botBubble]);
+
+            conversationHistory.push({ role: 'user', content: message });
+            conversationHistory.push({ role: 'assistant', content: data.response });
 
             // RAG evidence
             if (data.retrievedChunks && data.retrievedChunks.length > 0) {
                 const evidence = document.createElement("div");
-                evidence.style.cssText = "font-size:0.8em; color:#666; border-left:3px solid #ccc; padding:6px 10px; margin:4px 0;";
+                evidence.classList.add("rag-evidence");
 
-                const methodLabel = document.createElement("div");
-                methodLabel.style.fontWeight = "bold";
-                methodLabel.textContent = `📎 ${data.retrievalMethod} retrieval — top score: ${data.confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${data.confidence?.chunkCount ?? 0}`;
-                evidence.appendChild(methodLabel);
+                const label = document.createElement("div");
+                label.classList.add("rag-evidence__label");
+                label.textContent = `${data.retrievalMethod} retrieval — top score: ${data.confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${data.confidence?.chunkCount ?? 0}`;
+                evidence.appendChild(label);
 
                 data.retrievedChunks.forEach((chunk, i) => {
                     const chunkEl = document.createElement("div");
-                    chunkEl.style.marginTop = "4px";
+                    chunkEl.classList.add("rag-evidence__chunk");
                     chunkEl.textContent = `[${i + 1}] (${chunk.score?.toFixed(3) ?? '?'}) ${chunk.documentName}: ${chunk.chunkText.slice(0, 100)}...`;
                     evidence.appendChild(chunkEl);
                 });
@@ -83,11 +115,6 @@ inputField.addEventListener("keypress", (event) => {
     }
 });
 
-const retrievalMethod = document.getElementById("retrieval-method");
-
-retrievalMethod.addEventListener("change", () => {
-    console.log("Retrieval method: ", retrievalMethod.value);
-})
 
 const uploadBtn = document.getElementById("upload-btn");
 
@@ -96,27 +123,40 @@ uploadBtn.addEventListener("click", () => {
     console.log("Selected files: ", fileInput.files[fileInput.files.length - 1].name.toString().trim());
 });
 
-// Load chat history on page load
-(async () => {
+async function loadConversationHistory() {
     const res = await fetch('/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantID })
+        body: JSON.stringify({ participantID, limit: MAX_INTERACTIONS })
     });
     const data = await res.json();
 
-    // Loop through history and display each message pair
-    data.history.forEach(entry => {
-        const userMsg = document.createElement('div');
-        userMsg.textContent = entry.userInput;
-        userMsg.style.textAlign = 'right';
-        messagesContainer.appendChild(userMsg);
+    if (data.history && data.history.length > 0) {
+        data.history.forEach(entry => {
+            const userWrapper = document.createElement('div');
+            userWrapper.classList.add('message', 'message--user');
+            const userBubble = document.createElement('div');
+            userBubble.classList.add('message__bubble');
+            userBubble.textContent = entry.userInput;
+            userWrapper.appendChild(userBubble);
+            messagesContainer.appendChild(userWrapper);
 
-        const botMsg = document.createElement('div');
-        botMsg.textContent = entry.botResponse;
-        messagesContainer.appendChild(botMsg);
-    });
-})();
+            const botWrapper = document.createElement('div');
+            botWrapper.classList.add('message', 'message--bot');
+            const botBubble = document.createElement('div');
+            botBubble.classList.add('message__bubble');
+            botBubble.textContent = entry.botResponse;
+            botWrapper.appendChild(botBubble);
+            messagesContainer.appendChild(botWrapper);
+
+            conversationHistory.push({ role: 'user', content: entry.userInput });
+            conversationHistory.push({ role: 'assistant', content: entry.botResponse });
+        });
+    }
+}
+
+window.onload = loadConversationHistory;
+
 
 // Function to log events to the server
 function logEvent(type, element) {

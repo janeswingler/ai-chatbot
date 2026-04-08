@@ -73,13 +73,39 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// POST route to fetch conversation history by participantID
+app.post('/history', async (req, res) => {
+  const { participantID, limit } = req.body;
+  if (!participantID) {
+    return res.status(400).send('Participant ID is required');
+  }
+  try {
+    const n = parseInt(limit) || 5;
+    const interactions = await Interaction.find({ participantID })
+      .sort({ timestamp: -1 })
+      .limit(n);
+    // Reverse so they're in chronological order for display
+    const history = interactions.reverse();
+    res.json({ history });
+  } catch (error) {
+    console.error('Error fetching conversation history:', error.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // Handles incoming chat messages
 app.post('/chat', async (req, res) => {
   try {
-    const { message, participantID, retrievalMethod } = req.body;
+    const { history = [], input: userInput, message, participantID, systemID, retrievalMethod } = req.body;
+    // Support both old `message` field and new `input` field
+    const userMessage = userInput || message;
+
+    if (!participantID) {
+      return res.status(400).send('Participant ID is required');
+    }
 
     // Retrieve relevant chunks
-    const chunks = await retrievalService.retrieve(message, {
+    const chunks = await retrievalService.retrieve(userMessage, {
       method: retrievalMethod || 'semantic',
       topK: 3
     });
@@ -97,13 +123,23 @@ app.post('/chat', async (req, res) => {
       ? `You are a helpful assistant. Use the following retrieved context to answer the user's question. Base your answer on this evidence.\n\nContext:\n${chunks.map((c, i) => `[${i + 1}] ${c.chunkText}`).join('\n\n')}`
       : `You are a helpful assistant. No relevant documents were found; answer from general knowledge.`;
 
+    // Build message array: system prompt + conversation history + new user message
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter(m => m && (m.role === 'user' || m.role === 'assistant'))
+          .map(m => ({ role: m.role, content: String(m.content ?? '') }))
+      : [];
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...safeHistory,
+      { role: 'user', content: userMessage }
+    ];
+
     const chatResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      max_tokens: 100,
+      messages,
+      max_tokens: 1000,
     });
 
     const botResponse = chatResponse.choices[0].message.content.trim();
@@ -111,7 +147,7 @@ app.post('/chat', async (req, res) => {
     // Save full interaction with retrieval metadata
     const interaction = new Interaction({
       participantID,
-      userInput: message,
+      userInput: userMessage,
       botResponse,
       retrievalMethod: retrievalMethod || 'semantic',
       retrievedChunks: chunks.map(c => ({

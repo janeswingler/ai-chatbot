@@ -2,23 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI ChatBot</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
-<body>
-    <h1>Welcome to the AI ChatBot</h1>
-    <p>This chatbot responds to messages you send it via OpenAI!</p>
-    <label for="user-input">
-        <input type="text" id="user-input" placeholder="Enter your ID here...">
-    </label>
-    <button id="start-btn">Start Chat</button>
+<body class="login-page">
+    <div class="login-card">
+        <div class="login-card__logo" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+        <h1>AI ChatBot</h1>
+        <p>Enter your Participant ID to begin your session</p>
+        <form id="participant-form">
+            <div class="field">
+                <label for="participantID">Participant ID</label>
+                <input type="text" id="participantID" name="participantID" placeholder="e.g. 42" required autocomplete="off" />
+            </div>
+            <button type="submit" class="btn-primary">Start Chat</button>
+        </form>
+    </div>
     <script>
-        document.getElementById('start-btn').addEventListener('click', function () {
-            const id = document.getElementById('user-input').value.trim();
-            if (id) {
-                localStorage.setItem('participantID', id);
-                window.location.href = 'chat.html';
-            }
+        document.getElementById('participant-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const participantID = document.getElementById('participantID').value.trim();
+            localStorage.setItem('participantID', participantID);
+            const systemID = parseInt(participantID) % 2 === 1 ? 1 : 2;
+            window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
         });
     </script>
 </body>

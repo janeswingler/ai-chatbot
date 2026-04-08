@@ -7,3 +7,4 @@ pnpm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+uploads/
