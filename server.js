@@ -139,7 +139,7 @@ app.post('/chat', async (req, res) => {
     const chatResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages,
-      max_tokens: 1000,
+      max_tokens: 200,
     });
 
     const botResponse = chatResponse.choices[0].message.content.trim();
