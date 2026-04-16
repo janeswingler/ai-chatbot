@@ -14,13 +14,24 @@ const params = new URLSearchParams(window.location.search);
 const participantID = params.get('participantID') || localStorage.getItem('participantID');
 const systemID = params.get('systemID');
 
-document.getElementById('prototype-btn').addEventListener('click', () => {
-  window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
-});
+const prototypeBtn = document.getElementById('prototype-btn');
+if (prototypeBtn) {
+  prototypeBtn.addEventListener('click', () => {
+    window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
+  });
+}
 
-document.getElementById('task-btn').addEventListener('click', () => {
-  alert('Add your task instructions here or link this button to a task page.');
-});
+const taskBtn = document.getElementById('task-btn');
+if (taskBtn) {
+  taskBtn.addEventListener('click', () => {
+    alert('Add your task instructions here or link this button to a task page.');
+  });
+}
+
+const surveyBtn = document.getElementById('survey-btn');
+if (surveyBtn) {
+  surveyBtn.addEventListener('click', redirectToQualtrics);
+}
 
 // Alert and prompt if no participantID
 if (!participantID) {
@@ -125,7 +136,10 @@ inputField.addEventListener("keypress", (event) => {
 });
 
 
-const uploadBtn = document.getElementById("upload-btn").addEventListener('click', redirectToQualtrics);
+const uploadBtn = document.getElementById("upload-btn");
+if (uploadBtn) {
+  uploadBtn.addEventListener('click', redirectToQualtrics);
+}
 
 function redirectToQualtrics() {
   fetch('/redirect-to-survey', {
@@ -176,7 +190,7 @@ async function loadConversationHistory() {
     }
 }
 
-window.onload = loadConversationHistory;
+if (messagesContainer) window.onload = loadConversationHistory;
 
 
 // Function to log events to the server
@@ -201,7 +215,7 @@ if (inputField) {
 }
 
 // File upload handling
-uploadBtn.addEventListener("click", async () => {
+if (uploadBtn) uploadBtn.addEventListener("click", async () => {
     const fileInput = document.getElementById("file-input");
     const file = fileInput.files[0];
     if (!file) return alert("Please select a file first.");
@@ -245,4 +259,4 @@ async function loadDocuments() {
 }
 
 // Load documents on page load
-loadDocuments();
+if (document.getElementById("uploaded-docs")) loadDocuments();
