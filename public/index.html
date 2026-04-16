@@ -29,7 +29,7 @@
             const participantID = document.getElementById('participantID').value.trim();
             localStorage.setItem('participantID', participantID);
             const systemID = parseInt(participantID) % 2 === 1 ? 1 : 2;
-            window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
+            window.location.href = `/study-workflow.html?participantID=${participantID}&systemID=${systemID}`;
         });
     </script>
 </body>

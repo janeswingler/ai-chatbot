@@ -35,6 +35,15 @@ const documentProcessor = require("./services/documentProcessor");
 const embeddingService = require("./services/embeddingService");
 const upload = multer({ dest: "uploads/" }); // Save uploaded files so documentProcessor.js can read them
 
+app.post('/redirect-to-survey', (req, res) => {
+  const { participantID } = req.body;
+
+  const qualtricsBaseUrl = 'https://usfca.qualtrics.com/jfe/form/SV_80rjL7xUR9J6RFk';
+
+  const surveyUrl = `${qualtricsBaseUrl}?participantID=${encodeURIComponent(participantID)}`;
+
+  res.send(surveyUrl);
+});
 
 app.post('/submit-prompt', async (req, res) => {
   try {

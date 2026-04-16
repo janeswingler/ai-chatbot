@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('./server.js'\\)\")",
+      "Bash(curl -s http://localhost:3001/)",
+      "Read(//c/Users/jswin/Documents/compoundifai/**)",
+      "Read(//c/Users/jswin/.claude/projects/c--Users-jswin-Documents-ai-chatbot/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\jswin\\Documents\\compoundifai",
+      "C:\\Users\\jswin\\.claude\\projects\\c--Users-jswin-Documents-ai-chatbot"
+    ]
+  }
+}

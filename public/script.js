@@ -14,6 +14,14 @@ const params = new URLSearchParams(window.location.search);
 const participantID = params.get('participantID') || localStorage.getItem('participantID');
 const systemID = params.get('systemID');
 
+document.getElementById('prototype-btn').addEventListener('click', () => {
+  window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
+});
+
+document.getElementById('task-btn').addEventListener('click', () => {
+  alert('Add your task instructions here or link this button to a task page.');
+});
+
 // Alert and prompt if no participantID
 if (!participantID) {
 alert('Please enter a participant ID.');
@@ -111,17 +119,30 @@ const sendMessage = async () => {
 sendBtn.addEventListener("click", sendMessage);
 inputField.addEventListener("keypress", (event) => {
     if (event.key === "Enter") {
+        logEvent('keypress', 'Enter Key');
         sendMessage();
     }
 });
 
 
-const uploadBtn = document.getElementById("upload-btn");
+const uploadBtn = document.getElementById("upload-btn").addEventListener('click', redirectToQualtrics);
 
-uploadBtn.addEventListener("click", () => {
-    const fileInput = document.getElementById("file-input");
-    console.log("Selected files: ", fileInput.files[fileInput.files.length - 1].name.toString().trim());
-});
+function redirectToQualtrics() {
+  fetch('/redirect-to-survey', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantID })
+  })
+    .then(response => response.text())
+    .then(url => {
+      logEvent('redirect', 'Qualtrics Survey');
+      window.location.href = url;
+    })
+    .catch(error => {
+      console.error('Error redirecting to survey:', error);
+      alert('There was an error redirecting to the survey. Please try again.');
+    });
+}
 
 async function loadConversationHistory() {
     const res = await fetch('/history', {
