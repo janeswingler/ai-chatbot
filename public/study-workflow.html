@@ -6,28 +6,65 @@
   <title>Study Workflow</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <h1>Study Workflow</h1>
-  <p>Please complete the following steps in order.</p>
+<body class="workflow-page">
+  <div class="workflow-card">
+    <h1>Study Workflow</h1>
+    <p style="font-size:0.92rem; color:#56708f; margin-top:-8px;">
+      Please complete each step in order. Use the buttons below to navigate.
+    </p>
 
-  <ol id="workflow-list">
-    <li>
-      <button id="survey-btn" class="workflow-btn">
-        1. Complete the demographics questionnaire.
-      </button>
-    </li>
-    <li>
-      <button id="task-btn" class="workflow-btn" type="button">
-        2. Read the task.
-      </button>
-    </li>
-    <li>
-      <button id="prototype-btn" class="workflow-btn" type="button">
-        3. Use the AI system to complete the task.
-      </button>
-    </li>
-  </ol>
+    <ol>
+      <li id="step-demographics">
+        <strong>Demographics Questionnaire <span class="step-badge" id="badge-demographics"></span></strong>
+        <p style="font-size:0.85rem;color:#56708f;margin:4px 0 8px;">
+          Complete the background survey before starting the task.
+        </p>
+        <button id="demographics-btn" class="btn-primary" type="button">
+          Open Demographics Survey
+        </button>
+      </li>
 
+      <li id="step-pre-task">
+        <strong>Pre-Task Questionnaire <span class="step-badge" id="badge-pre-task"></span></strong>
+        <p style="font-size:0.85rem;color:#56708f;margin:4px 0 8px;">
+          Complete this questionnaire before using the system.
+        </p>
+        <button id="pre-task-btn" class="btn-primary" type="button">
+          Open Pre-Task Survey
+        </button>
+      </li>
+
+      <li id="step-task">
+        <strong>Task Instructions <span class="step-badge" id="badge-task"></span></strong>
+        <p style="font-size:0.85rem;color:#56708f;margin:4px 0 8px;">
+          Read the task you will complete using the AI system.
+        </p>
+        <button id="task-btn" class="btn-primary" type="button">
+          View Task
+        </button>
+      </li>
+
+      <li id="step-prototype">
+        <strong>AI Study System <span class="step-badge" id="badge-prototype"></span></strong>
+        <p style="font-size:0.85rem;color:#56708f;margin:4px 0 8px;">
+          Use the AI system to complete the task.
+        </p>
+        <button id="prototype-btn" class="btn-primary" type="button">
+          Open AI System
+        </button>
+      </li>
+
+      <li id="step-post-task">
+        <strong>Post-Task Questionnaire <span class="step-badge" id="badge-post-task"></span></strong>
+        <p style="font-size:0.85rem;color:#56708f;margin:4px 0 8px;">
+          Complete this questionnaire after finishing the task.
+        </p>
+        <button id="post-task-btn" class="btn-primary" type="button">
+          Open Post-Task Survey
+        </button>
+      </li>
+    </ol>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

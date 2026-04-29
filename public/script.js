@@ -1,262 +1,744 @@
-
-const inputField = document.getElementById("user-input");
-
-const sendBtn = document.getElementById("send-btn");
-
-const messagesContainer = document.getElementById("messages");
-const retrievalMethod = document.getElementById("retrieval-method");
-
-
-// Read the query string from the current page URL so we can extract values like participantID and systemID
 const params = new URLSearchParams(window.location.search);
-
-// Retrieve participantID and system ID from localStorage
 const participantID = params.get('participantID') || localStorage.getItem('participantID');
-const systemID = params.get('systemID');
+const systemID = params.get('systemID') || localStorage.getItem('systemID');
+
+if (!participantID) {
+  alert('No participant ID found.');
+  window.location.href = '/';
+}
+
+function logEvent(type, element) {
+  fetch('/log-event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantID, eventType: type, elementName: element, timestamp: new Date() })
+  }).catch(() => {});
+}
+
+function redirectToQualtrics(surveyType) {
+  fetch('/redirect-to-survey', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantID, systemID, surveyType })
+  })
+    .then(r => {
+      if (!r.ok) return r.text().then(msg => { throw new Error(msg); });
+      return r.text();
+    })
+    .then(url => { logEvent('redirect', surveyType + '-survey'); window.location.href = url; })
+    .catch(err => alert('Could not open survey: ' + err.message));
+}
+
+const PROGRESS_KEY = `studyProgress_${participantID}`;
+
+function getProgress() {
+  try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; } catch { return {}; }
+}
+
+function markStepComplete(step) {
+  const progress = getProgress();
+  progress[step] = true;
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  applyStepDone(step);
+}
+
+function applyStepDone(step) {
+  const li = document.getElementById('step-' + step);
+  const badge = document.getElementById('badge-' + step);
+  if (li) li.classList.add('step-done');
+  if (badge) badge.textContent = '✓ Completed';
+}
+
+function restoreProgress() {
+  const progress = getProgress();
+  Object.keys(progress).forEach(step => { if (progress[step]) applyStepDone(step); });
+}
+
+const completedStep = params.get('completed');
+if (completedStep) markStepComplete(completedStep);
+restoreProgress();
+
+const demographicsBtn = document.getElementById('demographics-btn');
+if (demographicsBtn) demographicsBtn.addEventListener('click', () => redirectToQualtrics('demographics'));
+
+const preTaskBtn = document.getElementById('pre-task-btn');
+if (preTaskBtn) preTaskBtn.addEventListener('click', () => redirectToQualtrics('pre-task'));
+
+const taskBtn = document.getElementById('task-btn');
+if (taskBtn) taskBtn.addEventListener('click', () => {
+  markStepComplete('task');
+  window.location.href = '/task.html';
+});
 
 const prototypeBtn = document.getElementById('prototype-btn');
 if (prototypeBtn) {
   prototypeBtn.addEventListener('click', () => {
-    window.location.href = `/chat.html?participantID=${participantID}&systemID=${systemID}`;
+    markStepComplete('prototype');
+    const dest = String(systemID) === '1'
+      ? `/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
+      : `https://compoundify.onrender.com?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
+    window.location.href = dest;
   });
 }
 
-const taskBtn = document.getElementById('task-btn');
-if (taskBtn) {
-  taskBtn.addEventListener('click', () => {
-    alert('Add your task instructions here or link this button to a task page.');
+const postTaskBtn = document.getElementById('post-task-btn');
+if (postTaskBtn) postTaskBtn.addEventListener('click', () => redirectToQualtrics('post-task'));
+
+if (document.getElementById('messages')) {
+
+document.getElementById('topbar-pid').textContent = `ID: ${participantID}`;
+
+const RIGHT_W_KEY = 'ai_right_w';
+(function restoreColumnWidth() {
+  const rw = localStorage.getItem(RIGHT_W_KEY);
+  if (rw) document.documentElement.style.setProperty('--right-w', rw);
+})();
+
+(function initResizer() {
+  const resizer = document.getElementById('resizer-right');
+  const root = document.documentElement;
+  const MIN = 160, MAX = 600;
+
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startPx = parseInt(getComputedStyle(root).getPropertyValue('--right-w'));
+    resizer.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMove(e) {
+      const delta = startX - e.clientX;
+      const newW = Math.max(MIN, Math.min(MAX, startPx + delta)) + 'px';
+      root.style.setProperty('--right-w', newW);
+      localStorage.setItem(RIGHT_W_KEY, newW);
+    }
+    function onUp() {
+      resizer.classList.remove('is-dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
-}
 
-const surveyBtn = document.getElementById('survey-btn');
-if (surveyBtn) {
-  surveyBtn.addEventListener('click', redirectToQualtrics);
-}
+  resizer.addEventListener('dblclick', () => {
+    root.style.setProperty('--right-w', '260px');
+    localStorage.setItem(RIGHT_W_KEY, '260px');
+  });
+})();
 
-// Alert and prompt if no participantID
-if (!participantID) {
-alert('Please enter a participant ID.');
-// Redirect to login if no participantID is set
-window.location.href = '/';
-}
+let conversationHistory = [];
+let msgCounter = 0;
+let notesData = [];
+let editingNoteId = null;
+let composerMinimized = false;
+let composerExpanded = false;
 
-const MAX_INTERACTIONS = 5;
-const conversationHistory = [];
+const messagesEl          = document.getElementById('messages');
+const userInput           = document.getElementById('user-input');
+const sendBtn             = document.getElementById('send-btn');
+const typingEl            = document.getElementById('typing-indicator');
+const notesList           = document.getElementById('notes-list');
+const retrievalMethodEl   = document.getElementById('retrieval-method');
+const noteComposer        = document.getElementById('note-composer');
+const noteComposerHeader  = document.getElementById('note-composer-header');
+const noteComposerTitleEl = document.getElementById('note-composer-title');
+const noteComposerTitleInput = document.getElementById('note-composer-title-input');
+const noteComposerContent = document.getElementById('note-composer-content');
+const noteComposerIsFormula = document.getElementById('note-composer-is-formula');
 
-const sendMessage = async () => {
-    const message = inputField.value.trim();
-    if (message !== null && message !== "") {
-        const selectedMethod = retrievalMethod.value;
-        const msg = document.createElement("div");
-        msg.classList.add("message", "message--user");
-        const userBubble = document.createElement("div");
-        userBubble.classList.add("message__bubble");
-        userBubble.textContent = message;
-        msg.appendChild(userBubble);
-        messagesContainer.appendChild(msg);
-        inputField.value = "";
-        messagesContainer.scrollTop = messagesContainer.scrollHeight; //auto scroll
-
-        try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    history: conversationHistory.slice(-10),
-                    input: message,
-                    participantID,
-                    systemID,
-                    retrievalMethod: selectedMethod
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Server error');
-            }
-            const data = await response.json();
-            console.log('Server response:', data);
-
-            // Bot response — protect math blocks before marked processes them
-            const mathBlocks = [];
-            let protectedText = data.response
-                .replace(/\\\[[\s\S]*?\\\]/g, match => { mathBlocks.push(match); return `%%MATH${mathBlocks.length - 1}%%`; })
-                .replace(/\\\([\s\S]*?\\\)/g, match => { mathBlocks.push(match); return `%%MATH${mathBlocks.length - 1}%%`; });
-            let rendered = marked.parse(protectedText);
-            rendered = rendered.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
-
-            const botWrapper = document.createElement("div");
-            botWrapper.classList.add("message", "message--bot");
-            const botBubble = document.createElement("div");
-            botBubble.classList.add("message__bubble");
-            botBubble.innerHTML = rendered;
-            botWrapper.appendChild(botBubble);
-            messagesContainer.appendChild(botWrapper);
-            MathJax.typesetPromise([botBubble]);
-
-            conversationHistory.push({ role: 'user', content: message });
-            conversationHistory.push({ role: 'assistant', content: data.response });
-
-            // RAG evidence
-            if (data.retrievedChunks && data.retrievedChunks.length > 0) {
-                const evidence = document.createElement("div");
-                evidence.classList.add("rag-evidence");
-
-                const label = document.createElement("div");
-                label.classList.add("rag-evidence__label");
-                label.textContent = `${data.retrievalMethod} retrieval — top score: ${data.confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${data.confidence?.chunkCount ?? 0}`;
-                evidence.appendChild(label);
-
-                data.retrievedChunks.forEach((chunk, i) => {
-                    const chunkEl = document.createElement("div");
-                    chunkEl.classList.add("rag-evidence__chunk");
-                    chunkEl.textContent = `[${i + 1}] (${chunk.score?.toFixed(3) ?? '?'}) ${chunk.documentName}: ${chunk.chunkText.slice(0, 100)}...`;
-                    evidence.appendChild(chunkEl);
-                });
-
-                messagesContainer.appendChild(evidence);
-            }
-
-            messagesContainer.scrollTop = messagesContainer.scrollHeight; //auto scroll
-        } catch (error) {
-            console.error('Failed to send message', error);
-        }
-    } else {
-        alert("Please enter a message");
-    }
-};
-
-sendBtn.addEventListener("click", sendMessage);
-inputField.addEventListener("keypress", (event) => {
-    if (event.key === "Enter") {
-        logEvent('keypress', 'Enter Key');
-        sendMessage();
-    }
+userInput.addEventListener('input', () => {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 140) + 'px';
 });
 
+userInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    logEvent('keypress', 'Enter Key');
+    handleSend();
+  }
+});
 
-const uploadBtn = document.getElementById("upload-btn");
-if (uploadBtn) {
-  uploadBtn.addEventListener('click', redirectToQualtrics);
+const mathPanel      = document.getElementById('math-panel');
+const mathField      = document.getElementById('math-field');
+const mathToggleBtn  = document.getElementById('math-toggle-btn');
+const mathToggleIcon = document.getElementById('math-toggle-icon');
+const mathInsertBtn  = document.getElementById('math-insert-btn');
+
+function hideMathLiveToolbar() {
+  if (!mathField.shadowRoot) return;
+  if (mathField.shadowRoot.querySelector('#no-vkb')) return;
+  const s = document.createElement('style');
+  s.id = 'no-vkb';
+  s.textContent = `
+    .ML__virtual-keyboard-toggle,
+    [part="virtual-keyboard-toggle"],
+    [part="menu-toggle"],
+    .ML__menu-toggle,
+    .ML__toolbar { display: none !important; }
+  `;
+  mathField.shadowRoot.appendChild(s);
 }
 
-function redirectToQualtrics() {
-  fetch('/redirect-to-survey', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantID })
-  })
-    .then(response => response.text())
-    .then(url => {
-      logEvent('redirect', 'Qualtrics Survey');
-      window.location.href = url;
-    })
-    .catch(error => {
-      console.error('Error redirecting to survey:', error);
-      alert('There was an error redirecting to the survey. Please try again.');
+customElements.whenDefined('math-field').then(() => {
+  mathField.mathVirtualKeyboardPolicy = 'off';
+  requestAnimationFrame(hideMathLiveToolbar);
+  mathField.addEventListener('focus', hideMathLiveToolbar);
+});
+
+mathField.addEventListener('focusin', () => {
+  if (window.mathVirtualKeyboard) window.mathVirtualKeyboard.visible = false;
+});
+mathField.addEventListener('virtual-keyboard-toggle', () => {
+  if (window.mathVirtualKeyboard) window.mathVirtualKeyboard.visible = false;
+});
+window.addEventListener('virtual-keyboard-toggle', () => {
+  if (window.mathVirtualKeyboard) window.mathVirtualKeyboard.visible = false;
+});
+
+const CHEVRON_UP   = `<polyline points="18 15 12 9 6 15"/>`;
+const CHEVRON_DOWN = `<polyline points="6 9 12 15 18 9"/>`;
+
+function showMathPanel(show) {
+  mathPanel.style.display = show ? 'block' : 'none';
+  mathToggleIcon.innerHTML = show ? CHEVRON_UP : CHEVRON_DOWN;
+  mathToggleBtn.title = show ? 'Minimise math panel' : 'Show math panel';
+  if (show) mathField.focus();
+}
+
+mathToggleBtn.addEventListener('click', () => {
+  showMathPanel(mathPanel.style.display === 'none');
+});
+
+const CLOSE_SVG = `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="7" y2="7"/><line x1="7" y1="1" x2="1" y2="7"/></svg>`;
+
+function addMathChip(latex) {
+  const chipsEl = document.getElementById('math-chips');
+  chipsEl.style.display = 'flex';
+  const chip = document.createElement('span');
+  chip.className = 'math-chip';
+  chip.dataset.latex = latex;
+  chip.innerHTML = `<span class="math-chip__preview">\\(${latex}\\)</span><button class="math-chip__remove" type="button" title="Remove">${CLOSE_SVG}</button>`;
+  chip.querySelector('.math-chip__remove').addEventListener('click', () => {
+    chip.remove();
+    if (chipsEl.children.length === 0) chipsEl.style.display = 'none';
+  });
+  chipsEl.appendChild(chip);
+  MathJax.typesetPromise([chip]);
+}
+
+mathInsertBtn.addEventListener('click', () => {
+  const latex = mathField.value;
+  if (!latex) return;
+  addMathChip(latex);
+  mathField.value = '';
+  mathField.focus();
+});
+
+function extractBraces(str, start) {
+  let depth = 0, i = start, content = '';
+  while (i < str.length) {
+    if (str[i] === '{') depth++;
+    else if (str[i] === '}') { depth--; if (depth === 0) return { content, end: i }; }
+    if (depth > 0) content += str[i];
+    i++;
+  }
+  return { content, end: i };
+}
+
+function latexToMathJs(latex) {
+  let result = '', i = 0;
+  const s = latex.trim();
+  while (i < s.length) {
+    if (s[i] === '\\') {
+      let j = i + 1;
+      while (j < s.length && /[a-zA-Z]/.test(s[j])) j++;
+      const cmd = s.slice(i + 1, j);
+      if (cmd === 'frac') {
+        const num = extractBraces(s, j); j = num.end + 1;
+        const den = extractBraces(s, j); j = den.end + 1;
+        result += `((${latexToMathJs(num.content)})/(${latexToMathJs(den.content)}))`;
+        i = j;
+      } else if (cmd === 'sqrt') {
+        if (s[j] === '[') {
+          const nEnd = s.indexOf(']', j);
+          const n = s.slice(j + 1, nEnd); j = nEnd + 1;
+          const arg = extractBraces(s, j); j = arg.end + 1;
+          result += `nthRoot(${latexToMathJs(arg.content)},${latexToMathJs(n)})`; i = j;
+        } else {
+          const arg = extractBraces(s, j); j = arg.end + 1;
+          result += `sqrt(${latexToMathJs(arg.content)})`; i = j;
+        }
+      } else if (cmd === 'times' || cmd === 'cdot') { result += '*'; i = j; }
+      else if (cmd === 'div')    { result += '/';       i = j; }
+      else if (cmd === 'pi')     { result += 'pi';      i = j; }
+      else if (cmd === 'ln')     { result += 'log';     i = j; }
+      else if (cmd === 'log')    { result += 'log10';   i = j; }
+      else if (cmd === 'infty')  { result += 'Infinity'; i = j; }
+      else if (cmd === 'pm')     { result += '+';       i = j; }
+      else if (cmd === 'approx') { result += '~=';      i = j; }
+      else if (cmd === 'le' || cmd === 'leq') { result += '<='; i = j; }
+      else if (cmd === 'ge' || cmd === 'geq') { result += '>='; i = j; }
+      else if (cmd === 'ne')     { result += '!=';      i = j; }
+      else if (cmd === 'left' || cmd === 'right') { i = j; }
+      else { i = j; }
+    } else if (s[i] === '^') {
+      if (s[i + 1] === '{') {
+        const arg = extractBraces(s, i + 1);
+        result += `^(${latexToMathJs(arg.content)})`; i = arg.end + 1;
+      } else { result += '^'; i++; }
+    } else if (s[i] === '_') {
+      if (s[i + 1] === '{') { const arg = extractBraces(s, i + 1); i = arg.end + 1; }
+      else { i += 2; }
+    } else if (s[i] === '{') {
+      const arg = extractBraces(s, i);
+      result += `(${latexToMathJs(arg.content)})`; i = arg.end + 1;
+    } else { result += s[i]; i++; }
+  }
+  return result;
+}
+
+const mathResultEl     = document.getElementById('math-result');
+const mathResultValue  = document.getElementById('math-result-value');
+const mathResultInsert = document.getElementById('math-result-insert-btn');
+let lastResultLatex = '';
+
+document.getElementById('math-calc-btn').addEventListener('click', () => {
+  const latex = mathField.value;
+  if (!latex) return;
+  try {
+    const expr = latexToMathJs(latex);
+    const raw = math.evaluate(expr);
+    const formatted = math.format(raw, { precision: 10 });
+    lastResultLatex = formatted;
+    mathResultValue.innerHTML = `\\(${formatted}\\)`;
+    mathResultEl.style.display = 'flex';
+    MathJax.typesetPromise([mathResultValue]);
+  } catch (e) {
+    mathResultValue.textContent = 'Cannot evaluate';
+    mathResultEl.style.display = 'flex';
+    lastResultLatex = '';
+  }
+});
+
+mathResultInsert.addEventListener('click', () => {
+  if (!lastResultLatex) return;
+  addMathChip(lastResultLatex);
+  mathResultEl.style.display = 'none';
+  mathField.value = '';
+  lastResultLatex = '';
+});
+
+mathField.addEventListener('input', () => {
+  mathResultEl.style.display = 'none';
+  lastResultLatex = '';
+});
+
+document.querySelectorAll('.sym-btn').forEach(btn => {
+  btn.addEventListener('mousedown', e => {
+    e.preventDefault();
+    if (btn.dataset.cmd) {
+      mathField.executeCommand(btn.dataset.cmd);
+    } else {
+      mathField.insert(btn.dataset.latex);
+    }
+    mathField.focus();
+  });
+});
+
+sendBtn.addEventListener('click', () => {
+  logEvent('click', 'Send Button');
+  handleSend();
+});
+
+async function handleSend() {
+  const chipsEl = document.getElementById('math-chips');
+  const mathParts = [...chipsEl.querySelectorAll('.math-chip')].map(c => `$${c.dataset.latex}$`).join(' ');
+  const textPart = userInput.value.trim();
+  const message = [textPart, mathParts].filter(Boolean).join(' ');
+  if (!message) return;
+
+  chipsEl.innerHTML = '';
+  chipsEl.style.display = 'none';
+  appendUserMessage(message);
+  userInput.value = '';
+  userInput.style.height = 'auto';
+  showTyping(true);
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        history: conversationHistory.slice(-10),
+        input: message,
+        participantID,
+        retrievalMethod: retrievalMethodEl ? retrievalMethodEl.value : 'semantic'
+      })
     });
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    showTyping(false);
+    appendBotMessage(data.response, data.retrievedChunks, data.confidence, data.retrievalMethod);
+    conversationHistory.push({ role: 'user', content: message });
+    conversationHistory.push({ role: 'assistant', content: data.response });
+  } catch (err) {
+    showTyping(false);
+    appendBotMessage('Sorry, something went wrong. Please try again.');
+    console.error(err);
+  }
 }
 
-async function loadConversationHistory() {
+function appendUserMessage(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'message message--user';
+  const bubble = document.createElement('div');
+  bubble.className = 'message__bubble';
+  const mathBlocks = [];
+  let protected_ = text
+    .replace(/\$\$[\s\S]*?\$\$/g, m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; })
+    .replace(/\$[^$\n]+\$/g,      m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; })
+    .replace(/\\\[[\s\S]*?\\\]/g, m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; })
+    .replace(/\\\([\s\S]*?\\\)/g, m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
+  let escaped = protected_.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  escaped = escaped.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+  bubble.innerHTML = escaped;
+  MathJax.typesetPromise([bubble]);
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollChat();
+}
+
+function appendBotMessage(text, retrievedChunks, confidence, retrievalMethodUsed) {
+  const wrap = document.createElement('div');
+  wrap.className = 'message message--bot';
+  wrap.id = `msg-${++msgCounter}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message__bubble';
+  const mathBlocks = [];
+  let protected_ = text
+    .replace(/\\\[[\s\S]*?\\\]/g, m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; })
+    .replace(/\\\([\s\S]*?\\\)/g, m => { mathBlocks.push(m); return `%%MATH${mathBlocks.length - 1}%%`; });
+  let rendered = marked.parse(protected_);
+  rendered = rendered.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+  bubble.innerHTML = rendered;
+  MathJax.typesetPromise([bubble]);
+
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+
+  // RAG evidence display
+  if (retrievedChunks && retrievedChunks.length > 0) {
+    const evidence = document.createElement('div');
+    evidence.className = 'rag-evidence';
+    const label = document.createElement('div');
+    label.className = 'rag-evidence__label';
+    label.textContent = `${retrievalMethodUsed || 'semantic'} — top: ${confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${confidence?.chunkCount ?? 0}`;
+    evidence.appendChild(label);
+    retrievedChunks.forEach((chunk, i) => {
+      const chunkEl = document.createElement('div');
+      chunkEl.className = 'rag-evidence__chunk';
+      chunkEl.textContent = `[${i + 1}] ${chunk.documentName}: ${chunk.chunkText.slice(0, 80)}…`;
+      evidence.appendChild(chunkEl);
+    });
+    messagesEl.appendChild(evidence);
+  }
+
+  scrollChat();
+}
+
+const TRASH_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formulaToInlineMath(content) {
+  const trimmed = String(content || '').trim();
+  if (!trimmed) return '';
+  const bare = trimmed
+    .replace(/^\$\$([\s\S]+)\$\$$/, '$1')
+    .replace(/^\$([\s\S]+)\$$/, '$1')
+    .replace(/^\\\(([\s\S]+)\\\)$/, '$1')
+    .replace(/^\\\[([\s\S]+)\\\]$/, '$1')
+    .trim();
+  return `\\(${escapeHtml(bare)}\\)`;
+}
+
+async function saveNote(content, isFormula = false, messageRef = null, title = 'Untitled') {
+  try {
+    const res = await fetch('/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        participantID,
+        title,
+        content,
+        isFormula,
+        messageRef: null,
+        isHighlight: false
+      })
+    });
+    const note = await res.json();
+    notesData.push(note);
+    renderNotesUI();
+  } catch (err) {
+    console.error('Failed to save note', err);
+  }
+}
+
+function appendNoteItem(note) {
+  const item = document.createElement('div');
+  item.className = `note-item${note.isFormula ? ' note-item--formula' : ''}${note.isHighlight ? ' note-item--highlight' : ''}`;
+  item.dataset.id = note._id;
+  item.title = 'Double-click to edit note';
+
+  const header = document.createElement('div');
+  header.className = 'note-header';
+
+  const title = document.createElement('div');
+  title.className = 'note-title';
+  title.textContent = note.title || 'Untitled';
+  header.appendChild(title);
+
+  const del = document.createElement('button');
+  del.className = 'note-del';
+  del.type = 'button';
+  del.title = 'Delete note';
+  del.setAttribute('aria-label', 'Delete note');
+  del.innerHTML = TRASH_SVG;
+  del.addEventListener('click', () => deleteNote(note._id));
+  header.appendChild(del);
+  item.appendChild(header);
+
+  const text = document.createElement('p');
+  text.className = 'note-content';
+  if (note.isFormula) {
+    text.innerHTML = formulaToInlineMath(note.content);
+    MathJax.typesetPromise([text]);
+  } else {
+    text.textContent = note.content;
+  }
+  item.appendChild(text);
+
+  item.addEventListener('dblclick', (e) => {
+    if (e.target.closest('.note-del')) return;
+    openNoteComposer(note);
+  });
+
+  notesList.appendChild(item);
+}
+
+async function deleteNote(id) {
+  try {
+    await fetch(`/notes/${id}`, { method: 'DELETE' });
+    notesData = notesData.filter(n => n._id !== id);
+    renderNotesUI();
+  } catch (err) { console.error(err); }
+}
+
+async function updateNote(id, payload) {
+  try {
+    const res = await fetch(`/notes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) return null;
+    const updated = await res.json();
+    notesData = notesData.map(n => n._id === id ? updated : n);
+    renderNotesUI();
+    return updated;
+  } catch (err) { console.error(err); return null; }
+}
+
+async function loadNotes() {
+  try {
+    const res = await fetch(`/notes/${participantID}`);
+    notesData = await res.json();
+    renderNotesUI();
+  } catch (err) { console.error(err); }
+}
+
+function renderNotesUI() {
+  notesList.innerHTML = '';
+  if (notesData.length === 0) {
+    notesList.innerHTML = '<p class="empty-hint">Click "Create note" below to add your own note.</p>';
+    appendCreateNoteRow();
+    return;
+  }
+  notesData.forEach(n => appendNoteItem(n));
+  appendCreateNoteRow();
+  notesList.scrollTop = notesList.scrollHeight;
+}
+
+function appendCreateNoteRow() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'note-create-row';
+  btn.dataset.action = 'create-note';
+  btn.textContent = 'Create note';
+  notesList.appendChild(btn);
+}
+
+notesList.addEventListener('click', (e) => {
+  if (e.target.closest('[data-action="create-note"]')) openNoteComposer();
+});
+
+function openNoteComposer(note = null) {
+  editingNoteId = note?._id || null;
+  setComposerExpanded(false);
+  setComposerMinimized(false);
+  noteComposer.setAttribute('aria-hidden', 'false');
+  noteComposer.style.display = 'flex';
+  noteComposerTitleEl.textContent = note ? 'Edit Note' : 'Create Note';
+  noteComposerTitleInput.value = note?.title || '';
+  noteComposerContent.value = note?.content || '';
+  noteComposerIsFormula.checked = !!note?.isFormula;
+  noteComposerContent.focus();
+}
+
+function closeNoteComposer() {
+  noteComposer.style.display = 'none';
+  noteComposer.setAttribute('aria-hidden', 'true');
+  editingNoteId = null;
+  setComposerExpanded(false);
+  setComposerMinimized(false);
+  noteComposerTitleInput.value = '';
+  noteComposerContent.value = '';
+  noteComposerIsFormula.checked = false;
+}
+
+function setComposerMinimized(minimized) {
+  composerMinimized = minimized;
+  noteComposer.classList.toggle('note-composer--minimized', minimized);
+  document.getElementById('note-composer-min-btn').textContent = minimized ? '▢' : '_';
+  document.getElementById('note-composer-min-btn').title = minimized ? 'Restore' : 'Minimise';
+}
+
+function setComposerExpanded(expanded) {
+  composerExpanded = expanded;
+  noteComposer.classList.toggle('note-composer--expanded', expanded);
+  document.getElementById('note-composer-expand-btn').textContent = expanded ? '❐' : '□';
+  document.getElementById('note-composer-expand-btn').title = expanded ? 'Exit expanded view' : 'Expand';
+}
+
+document.getElementById('note-composer-close-btn').addEventListener('click', closeNoteComposer);
+document.getElementById('note-composer-cancel-btn').addEventListener('click', closeNoteComposer);
+document.getElementById('note-composer-min-btn').addEventListener('click', () => setComposerMinimized(!composerMinimized));
+document.getElementById('note-composer-expand-btn').addEventListener('click', () => setComposerExpanded(!composerExpanded));
+
+noteComposerHeader.addEventListener('dblclick', () => {
+  if (composerMinimized) { setComposerMinimized(false); return; }
+  setComposerExpanded(!composerExpanded);
+});
+
+document.getElementById('note-composer-save-btn').addEventListener('click', async () => {
+  const content = noteComposerContent.value.trim();
+  if (!content) return;
+  const title = noteComposerTitleInput.value.trim() || 'Untitled';
+  const isFormula = noteComposerIsFormula.checked;
+  if (editingNoteId) {
+    await updateNote(editingNoteId, { title, content, isFormula });
+  } else {
+    await saveNote(content, isFormula, null, title);
+  }
+  closeNoteComposer();
+});
+
+document.getElementById('export-notes-btn').addEventListener('click', async () => {
+  try {
+    const res = await fetch(`/notes/${participantID}`);
+    const notes = await res.json();
+    if (notes.length === 0) { alert('No notes to export.'); return; }
+    let text = `Study Assistant — Notes\nParticipant: ${participantID}\nExported: ${new Date().toLocaleString()}\n\n`;
+    notes.forEach(n => {
+      text += `[${n.title || 'Untitled'}] ${n.isFormula ? '[FORMULA] ' : ''}${n.content}\n`;
+    });
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `study-notes-${participantID}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) { alert('Export failed.'); }
+});
+
+function showTyping(show) {
+  typingEl.style.display = show ? 'flex' : 'none';
+  if (show) scrollChat();
+}
+
+function scrollChat() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+document.getElementById('upload-doc-btn').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const btn = document.getElementById('upload-doc-btn');
+  btn.classList.add('uploading');
+  btn.title = 'Uploading…';
+  const formData = new FormData();
+  formData.append('document', file);
+  try {
+    const res = await fetch('/upload-document', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok) {
+      appendBotMessage(`Document uploaded: **${data.filename}** (${data.chunkCount} chunks). You can now ask questions about it.`);
+    } else {
+      alert('Upload failed: ' + data.error);
+    }
+  } catch (err) {
+    alert('Upload failed.');
+  } finally {
+    btn.classList.remove('uploading');
+    btn.title = 'Attach a document (PDF or TXT)';
+    e.target.value = '';
+  }
+});
+
+if (userInput) {
+  userInput.addEventListener('mouseover', () => logEvent('hover', 'User Input'));
+  userInput.addEventListener('focus',     () => logEvent('focus', 'User Input'));
+}
+
+async function init() {
+  await loadNotes();
+  try {
     const res = await fetch('/history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantID, limit: MAX_INTERACTIONS })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantID, limit: 5 })
     });
     const data = await res.json();
-
     if (data.history && data.history.length > 0) {
-        data.history.forEach(entry => {
-            const userWrapper = document.createElement('div');
-            userWrapper.classList.add('message', 'message--user');
-            const userBubble = document.createElement('div');
-            userBubble.classList.add('message__bubble');
-            userBubble.textContent = entry.userInput;
-            userWrapper.appendChild(userBubble);
-            messagesContainer.appendChild(userWrapper);
-
-            const botWrapper = document.createElement('div');
-            botWrapper.classList.add('message', 'message--bot');
-            const botBubble = document.createElement('div');
-            botBubble.classList.add('message__bubble');
-            botBubble.textContent = entry.botResponse;
-            botWrapper.appendChild(botBubble);
-            messagesContainer.appendChild(botWrapper);
-
-            conversationHistory.push({ role: 'user', content: entry.userInput });
-            conversationHistory.push({ role: 'assistant', content: entry.botResponse });
-        });
+      data.history.forEach(entry => {
+        appendUserMessage(entry.userInput);
+        appendBotMessage(entry.botResponse, entry.retrievedChunks, entry.confidence, entry.retrievalMethod);
+        conversationHistory.push({ role: 'user', content: entry.userInput });
+        conversationHistory.push({ role: 'assistant', content: entry.botResponse });
+      });
+    } else {
+      appendBotMessage('Hi, how can I help you today?');
     }
+  } catch (err) {
+    console.error(err);
+    appendBotMessage('Hi, how can I help you today?');
+  }
 }
 
-if (messagesContainer) window.onload = loadConversationHistory;
+init();
 
-
-// Function to log events to the server
-function logEvent(type, element) {
-    fetch('/log-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantID, eventType: type, elementName: element, timestamp: new Date() })
-    });
 }
-
-if (sendBtn) {
-    sendBtn.addEventListener('click', () =>
-        logEvent('click', 'Send Button'));
-}
-
-if (inputField) {
-    inputField.addEventListener('mouseover', () =>
-        logEvent('hover', 'User Input'));
-    inputField.addEventListener('focus', () =>
-        logEvent('focus', 'User Input'));
-}
-
-// File upload handling
-if (uploadBtn) uploadBtn.addEventListener("click", async () => {
-    const fileInput = document.getElementById("file-input");
-    const file = fileInput.files[0];
-    if (!file) return alert("Please select a file first.");
-    const formData = new FormData();
-    formData.append("document", file);
-    try {
-        const res = await fetch("/upload-document", {
-            method: "POST",
-            body: formData  // No Content-Type header — browser sets it automatically
-        });
-        const data = await res.json();
-        if (res.ok) {
-            alert(`Uploaded: ${data.filename} (${data.chunkCount} chunks)`);
-            loadDocuments(); // Refresh the list
-        } else {
-            alert("Upload failed: " + data.error);
-        }
-    } catch (err) {
-        console.error("Upload error:", err);
-        alert("Upload failed.");
-    }
-});
-
-// Load and display uploaded documents
-async function loadDocuments() {
-    const response = await fetch("/documents");
-    const docs = await response.json();
-    const uploadedDocsEl = document.getElementById("uploaded-docs");
-    if (docs.length === 0) {
-        uploadedDocsEl.textContent = "No documents uploaded yet";
-        return;
-    }
-    uploadedDocsEl.innerHTML = "";
-    const list = document.createElement("ul");
-    docs.forEach(doc => {
-        const item = document.createElement("li");
-        item.textContent = `${doc.filename} — ${doc.processingStatus}`;
-        list.appendChild(item);
-    });
-    uploadedDocsEl.appendChild(list);
-}
-
-// Load documents on page load
-if (document.getElementById("uploaded-docs")) loadDocuments();

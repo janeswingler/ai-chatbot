@@ -1,4 +1,3 @@
-// Includes Express.js
 require('dotenv').config();
 const mongoose = require("mongoose");
 mongoose.connect(process.env.MONGO_URI)
@@ -13,35 +12,47 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
-// Creates an Express application
 const app = express();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Parse incoming JSON payloads from fetch requests
 app.use(express.json());
-
-// Serve everything in /public using an absolute path
 app.use(express.static(path.join(__dirname, 'public')));
 
 const Interaction = require('./models/Interaction');
+const Note = require('./models/Note');
 const retrievalService = require('./services/retrievalService');
-retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err)); // Initialize TF-IDF index 
-const EventLog = require('./models/EventLog'); // Import EventLog model
-const Document = require('./models/Document'); // Import Document model
+retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
+const EventLog = require('./models/EventLog');
+const Document = require('./models/Document');
 const multer = require("multer");
 const documentProcessor = require("./services/documentProcessor");
 const embeddingService = require("./services/embeddingService");
-const upload = multer({ dest: "uploads/" }); // Save uploaded files so documentProcessor.js can read them
+const upload = multer({ dest: "uploads/" });
+
+const SURVEY_URLS = {
+  demographics: 'https://usfca.qualtrics.com/jfe/form/SV_80rjL7xUR9J6RFk',
+
+  'pre-task': 'https://usfca.qualtrics.com/jfe/form/SV_6wXtobIQoynMpam',
+
+  'post-task': 'PLACEHOLDER_POST_TASK_SURVEY_URL',
+};
 
 app.post('/redirect-to-survey', (req, res) => {
-  const { participantID } = req.body;
+  const { participantID, systemID, surveyType = 'demographics' } = req.body;
 
-  const qualtricsBaseUrl = 'https://usfca.qualtrics.com/jfe/form/SV_80rjL7xUR9J6RFk';
+  const baseUrl = SURVEY_URLS[surveyType];
 
-  const surveyUrl = `${qualtricsBaseUrl}?participantID=${encodeURIComponent(participantID)}`;
+  if (!baseUrl || baseUrl.startsWith('PLACEHOLDER')) {
+    return res.status(400).send(
+      `Survey URL for "${surveyType}" is not configured yet. ` +
+      `Open server.js and replace the placeholder in SURVEY_URLS.`
+    );
+  }
 
+  let surveyUrl = `${baseUrl}?participantID=${encodeURIComponent(participantID)}`;
+  if (systemID) surveyUrl += `&systemID=${encodeURIComponent(systemID)}`;
   res.send(surveyUrl);
 });
 
@@ -77,12 +88,10 @@ app.post('/log-event', async (req, res) => {
   }
 });
 
-// Send the main chat UI
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// POST route to fetch conversation history by participantID
 app.post('/history', async (req, res) => {
   const { participantID, limit } = req.body;
   if (!participantID) {
@@ -93,7 +102,6 @@ app.post('/history', async (req, res) => {
     const interactions = await Interaction.find({ participantID })
       .sort({ timestamp: -1 })
       .limit(n);
-    // Reverse so they're in chronological order for display
     const history = interactions.reverse();
     res.json({ history });
   } catch (error) {
@@ -102,24 +110,20 @@ app.post('/history', async (req, res) => {
   }
 });
 
-// Handles incoming chat messages
 app.post('/chat', async (req, res) => {
   try {
     const { history = [], input: userInput, message, participantID, systemID, retrievalMethod } = req.body;
-    // Support both old `message` field and new `input` field
     const userMessage = userInput || message;
 
     if (!participantID) {
       return res.status(400).send('Participant ID is required');
     }
 
-    // Retrieve relevant chunks
     const chunks = await retrievalService.retrieve(userMessage, {
       method: retrievalMethod || 'semantic',
       topK: 3
     });
 
-    // Compute confidence metrics
     const scores = chunks.map(c => c.score || 0);
     const confidence = {
       topScore: scores.length > 0 ? Math.max(...scores) : 0,
@@ -127,12 +131,10 @@ app.post('/chat', async (req, res) => {
       chunkCount: chunks.length
     };
 
-    // Build RAG prompt
     const systemPrompt = chunks.length > 0
       ? `You are a helpful assistant. Use the following retrieved context to answer the user's question. Base your answer on this evidence.\n\nContext:\n${chunks.map((c, i) => `[${i + 1}] ${c.chunkText}`).join('\n\n')}`
       : `You are a helpful assistant. No relevant documents were found; answer from general knowledge.`;
 
-    // Build message array: system prompt + conversation history + new user message
     const safeHistory = Array.isArray(history)
       ? history
           .filter(m => m && (m.role === 'user' || m.role === 'assistant'))
@@ -153,9 +155,9 @@ app.post('/chat', async (req, res) => {
 
     const botResponse = chatResponse.choices[0].message.content.trim();
 
-    // Save full interaction with retrieval metadata
     const interaction = new Interaction({
       participantID,
+      systemID: systemID || null,
       userInput: userMessage,
       botResponse,
       retrievalMethod: retrievalMethod || 'semantic',
@@ -183,25 +185,23 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// File upload handling
 app.post("/upload-document", upload.single("document") , async (req, res) => {
     if (! req.file ) {
     return res.status(400).json({ error: "No file uploaded" });
     }
     try {
-      const processed = await documentProcessor.processDocument(req.file); // Extract text + chunks from the file
-      const chunksWithEmbeddings = await embeddingService.generateEmbeddings(processed.chunks); // Generate embeddings for the chunks
+      const processed = await documentProcessor.processDocument(req.file);
+      const chunksWithEmbeddings = await embeddingService.generateEmbeddings(processed.chunks);
         await Document.create({
             filename: req.file.originalname,
             text: processed.fullText,
             chunks: chunksWithEmbeddings.map((chunkObj) => ({
                 chunkIndex: chunkObj.chunkIndex,
                 text: chunkObj.text,
-                embedding: chunkObj.embedding || [] // Store embedding if available
+                embedding: chunkObj.embedding || []
             })),
             processingStatus: "completed"
         });
-        // Rebuild TF-IDF index so new doc is immediately searchable
         await retrievalService.rebuildIndex();
         res.json({
             status: "ok",
@@ -215,7 +215,6 @@ app.post("/upload-document", upload.single("document") , async (req, res) => {
     }
 });
 
-// route that allows the frontend to display what documents exist with processing status
 app.get("/documents", async (req, res) => {
     const docs = await Document.find({})
     .select("_id filename processingStatus processedAt")
@@ -223,7 +222,60 @@ app.get("/documents", async (req, res) => {
     res.json(docs);
 });
 
-// Starts server on port 3000
+app.post('/notes', async (req, res) => {
+  try {
+    const { participantID, title, content, topic, isFormula, messageRef, isHighlight } = req.body;
+    if (!participantID || !content) return res.status(400).json({ error: 'Missing fields' });
+    const note = new Note({
+      participantID,
+      title: (title || 'Untitled').trim() || 'Untitled',
+      content,
+      topic: topic || null,
+      isFormula: !!isFormula,
+      messageRef: messageRef || null,
+      isHighlight: !!isHighlight
+    });
+    await note.save();
+    res.json(note);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/notes/:participantID', async (req, res) => {
+  try {
+    const notes = await Note.find({ participantID: req.params.participantID }).sort({ createdAt: 1 });
+    res.json(notes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/notes/:id', async (req, res) => {
+  try {
+    const { title, content, isFormula } = req.body;
+    if (!content || !String(content).trim()) return res.status(400).json({ error: 'Content is required' });
+    const updated = await Note.findByIdAndUpdate(
+      req.params.id,
+      { title: (title || 'Untitled').trim() || 'Untitled', content: String(content).trim(), isFormula: !!isFormula },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Note not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/notes/:id', async (req, res) => {
+  try {
+    await Note.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log('Server is running on port ' + PORT);
 });
