@@ -51,34 +51,34 @@
         <span></span><span></span><span></span>
       </div>
 
-      <!-- Math panel (field + symbol shortcuts) -->
+      <!-- Math panel (field + symbol shortcuts, one unified panel) -->
       <div class="math-panel" id="math-panel">
         <div class="math-panel__field-row">
           <math-field id="math-field" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
-          <button type="button" class="btn-calc" id="math-calc-btn" title="Evaluate expression">=&nbsp;Calculate</button>
-          <button type="button" class="btn-ghost btn-sm" id="math-insert-btn">Insert ↑</button>
+          <div class="math-panel__actions">
+            <button type="button" class="btn-calc" id="math-calc-btn" title="Evaluate expression (Return)">=&nbsp;Calculate</button>
+            <button type="button" class="btn-ghost btn-sm" id="math-clear-btn" title="Clear the math field (Option+C)">Clear</button>
+            <button type="button" class="btn-ghost btn-sm" id="math-insert-btn" title="Insert result (or expression) into message (Option+I)">Insert ↑</button>
+          </div>
         </div>
         <div class="math-result" id="math-result" style="display:none">
           <span class="math-result__eq">=</span>
           <span class="math-result__value" id="math-result-value"></span>
-          <button type="button" class="btn-ghost btn-sm" id="math-result-insert-btn" title="Insert result into message">Insert ↑</button>
         </div>
         <div class="math-symbols">
-          <button class="sym-btn" data-latex="\frac{#0}{#0}" title="Fraction">a/b</button>
-          <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-          <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-          <button class="sym-btn" data-latex="^{#0}" title="Power">xⁿ</button>
+          <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+          <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+          <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+          <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
           <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
-          <button class="sym-btn" data-latex="\sqrt[#0]{#0}" title="Nth root">ⁿ√</button>
-          <button class="sym-btn" data-latex="\pi" title="Pi">π</button>
-          <button class="sym-btn" data-latex="\pm" title="Plus-minus">±</button>
-          <button class="sym-btn" data-latex="\times" title="Multiply">×</button>
+          <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
+          <button class="sym-btn" data-latex="+" title="Plus">+</button>
+          <button class="sym-btn" data-latex="-" title="Minus">−</button>
+          <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
           <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
-          <button class="sym-btn" data-latex="\approx" title="Approximately">≈</button>
-          <button class="sym-btn" data-latex="e" title="Euler's number">e</button>
-          <button class="sym-btn" data-latex="\ln" title="Natural log">ln</button>
-          <button class="sym-btn" data-latex="\log" title="Log">log</button>
-          <button class="sym-btn" data-latex="\infty" title="Infinity">∞</button>
+          <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+          <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+          <button class="sym-btn" id="math-negate-btn" title="Place a unary minus in front of the value to the left">(-)</button>
           <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
         </div>
       </div>
