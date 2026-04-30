@@ -16,10 +16,20 @@ function logEvent(type, element) {
 }
 
 function redirectToQualtrics(surveyType) {
+  // Collect additional embedded fields if present in the current page URL
+  const srcParams = new URLSearchParams(window.location.search);
+  const extras = {};
+  ['completed','quizSubmitted','timeSpent','tabSwitchCount','quizId'].forEach(k => {
+    const v = srcParams.get(k);
+    if (v !== null) extras[k] = v;
+  });
+
+  const body = Object.assign({ participantID, systemID, surveyType }, extras);
+
   fetch('/redirect-to-survey', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantID, systemID, surveyType })
+    body: JSON.stringify(body)
   })
     .then(r => {
       if (!r.ok) return r.text().then(msg => { throw new Error(msg); });
@@ -78,6 +88,14 @@ if (prototypeBtn) {
       ? `/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
       : `https://compoundify.onrender.com?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
     window.location.href = dest;
+  });
+}
+
+const postTaskQuizBtn = document.getElementById('post-task-quiz-btn');
+if (postTaskQuizBtn) {
+  postTaskQuizBtn.addEventListener('click', () => {
+    markStepComplete('post-task-quiz');
+    window.location.href = `/quiz.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
   });
 }
 
@@ -220,9 +238,6 @@ mathToggleBtn.addEventListener('click', () => {
 
 const CLOSE_SVG = `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="7" y2="7"/><line x1="7" y1="1" x2="1" y2="7"/></svg>`;
 
-// Strip an unpaired trailing backslash. MathJax otherwise renders it as a literal
-// "\" glyph in the result band or chip — even paired backslashes (\\) pass through
-// fine, so we only trim when the count is odd.
 function sanitizeLatex(s) {
   if (!s) return '';
   s = String(s);
@@ -267,12 +282,8 @@ document.getElementById('math-clear-btn').addEventListener('click', () => {
   mathField.focus();
 });
 
-// One-shot guard: suppress the next `input`-triggered clear (used after Calculate runs,
-// since MathLive may fire an input event after our keydown handler returns).
 let suppressInputClear = false;
 
-// Enter triggers Calculate, but only when the math-field is focused — otherwise it would
-// conflict with the chat textarea's Enter-to-send.
 mathField.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -283,10 +294,7 @@ mathField.addEventListener('keydown', (e) => {
   }
 });
 
-// Option/Alt + C and Option/Alt + I are global shortcuts (work from anywhere in the UI).
-// We listen at the window level on capture so MathLive's internal handler doesn't see
-// the keystroke. We still belt-and-suspender with a setTimeout sweep in case Mac OS
-// inserts a dead-key character (ˆ / ç) that bypasses preventDefault.
+
 function sweepStrayDeadKey() {
   const v = mathField.value;
   if (v === 'ˆ' || v === 'ç' || v === '˙' || v === 'ø') mathField.value = '';
@@ -308,8 +316,6 @@ window.addEventListener('keydown', (e) => {
   }
 }, { capture: true });
 
-// Clicking anywhere in the math panel (background, padding, label area) focuses the
-// math-field so the user can start typing immediately. Buttons and chips are excluded.
 mathPanel.addEventListener('mousedown', (e) => {
   if (e.target.closest('button, .math-chip, .math-symbols')) return;
   if (e.target === mathField) return;
@@ -336,10 +342,6 @@ function extractBraces(str, start) {
   return { content, end: i };
 }
 
-// Extract a single argument after a LaTeX control word: braced group, a single backslash
-// command, or a single character. Whitespace following a control word is a separator, not
-// part of the argument. Returns { content, end } where `end` is the index of the last
-// consumed character.
 function extractArg(str, start) {
   let i = start;
   while (i < str.length && /\s/.test(str[i])) i++;
@@ -458,7 +460,6 @@ document.getElementById('math-calc-btn').addEventListener('click', () => {
   }
 });
 
-// Clear result when field changes (unless a Calculate just ran).
 mathField.addEventListener('input', () => {
   if (suppressInputClear) {
     suppressInputClear = false;
@@ -468,16 +469,6 @@ mathField.addEventListener('input', () => {
   lastResultLatex = '';
 });
 
-// Find the last "atom" at the end of a LaTeX string: a balanced (...) group
-// (with any \left / \right wrappers MathLive serialised), a balanced multi-arg
-// \cmd{...}{...} block, a base value carrying a ^{...} / _{...} script, or a
-// digit/letter run. Returns the substring, or '' if the string ends with
-// whitespace or an operator.
-//
-// The walk has to be tight: any time `before = value.slice(0, value.length - atom.length)`
-// produces malformed LaTeX (orphaned \left, half a \placeholder, an unmatched
-// {), MathLive re-renders the literal command name as text and the user sees raw
-// LaTeX. So we must always return an atom whose removal leaves valid LaTeX.
 function findLastAtom(str) {
   function start(end) {
     while (end > 0 && /\s/.test(str[end - 1])) end--;
@@ -491,8 +482,7 @@ function findLastAtom(str) {
         if (str[k] === ')') depth++;
         else if (str[k] === '(') depth--;
       }
-      // Pull in a leading \left (with optional whitespace before the matched `(`)
-      // so the atom owns its \right counterpart inside the slice.
+
       let p = k;
       while (p > 0 && /\s/.test(str[p - 1])) p--;
       if (p >= 5 && str.slice(p - 5, p) === '\\left') return p - 5;
@@ -508,9 +498,7 @@ function findLastAtom(str) {
         if (str[k] === closing) depth++;
         else if (str[k] === opening) depth--;
       }
-      // Walk back through any preceding {...} / [...] argument groups, so
-      // multi-arg commands like \frac{a}{b} and \sqrt[n]{x} are treated as one
-      // atom rather than just their final brace group.
+
       while (k > 0) {
         let q = k;
         while (q > 0 && /\s/.test(str[q - 1])) q--;
@@ -526,13 +514,11 @@ function findLastAtom(str) {
         }
         k = kk;
       }
-      // Pull in any leading \command letters (so \sqrt{2} becomes one atom).
+
       let cmdStart = k;
       while (cmdStart > 0 && /[a-zA-Z]/.test(str[cmdStart - 1])) cmdStart--;
       if (cmdStart > 0 && str[cmdStart - 1] === '\\') return cmdStart - 1;
-      // If the brace group is a superscript / subscript, recurse so the base
-      // value comes along (5^{2} → atom is 5^{2}, not just {2}). Without this,
-      // before = "5^{" would be unbalanced and MathLive renders it as text.
+
       if (k > 0 && (str[k - 1] === '^' || str[k - 1] === '_')) {
         return start(k - 1);
       }
@@ -542,20 +528,16 @@ function findLastAtom(str) {
     if (/[0-9a-zA-Z.]/.test(last)) {
       let k = end - 1;
       while (k > 0 && /[0-9a-zA-Z.]/.test(str[k - 1])) k--;
-      // If the run is preceded by `\`, it's a control word (\cdot, \div, \times,
-      // …). Removing it would leave `before` ending with an orphan `\`, which
-      // MathLive then merges with whatever insert lands next or renders as raw
-      // text. Treat the control word as an operator — no atom.
+
       if (k > 0 && str[k - 1] === '\\') return end;
-      // If the run sits on top of a script marker (5^2, x_1 with no braces),
-      // recurse so the base value travels with it.
+
       if (k > 0 && (str[k - 1] === '^' || str[k - 1] === '_')) {
         return start(k - 1);
       }
       return k;
     }
 
-    return end; // operator / unrecognised — no atom
+    return end; 
   }
 
   if (!str) return '';
@@ -567,17 +549,12 @@ function findLastAtom(str) {
   return str.slice(k, i);
 }
 
-// True if there's a real value (number / identifier / closing-grouped expression) on
-// the left of the cursor. Heuristic: cursor sits at the end and the value's tail is
-// not whitespace or an operator.
+
 function hasValueOnLeft() {
   return findLastAtom(mathField.value) !== '';
 }
 
-// Insert a button payload. If the payload has a `#0` slot:
-//   - With a value on the left, splice that value into the `#0` position.
-//   - With nothing usable on the left, substitute `#0` with `#?` so MathLive renders
-//     a real placeholder box at that position with the cursor in it.
+
 function symButtonInsert(payload) {
   if (!payload) return;
   if (!payload.includes('#0')) {
@@ -610,8 +587,7 @@ document.querySelectorAll('.sym-btn').forEach(btn => {
   });
 });
 
-// Unary minus: place `-` immediately in front of the value to the left. If nothing
-// useful is to the left, just insert a `-` at the cursor.
+
 document.getElementById('math-negate-btn').addEventListener('mousedown', (e) => {
   e.preventDefault();
   logEvent('click', 'Math Symbol: (-)');

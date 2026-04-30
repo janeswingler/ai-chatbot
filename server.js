@@ -22,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const Interaction = require('./models/Interaction');
 const Note = require('./models/Note');
+const Quiz = require('./models/Quiz');
 const retrievalService = require('./services/retrievalService');
 retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
 const EventLog = require('./models/EventLog');
@@ -36,7 +37,7 @@ const SURVEY_URLS = {
 
   'pre-task': 'https://usfca.qualtrics.com/jfe/form/SV_6wXtobIQoynMpam',
 
-  'post-task': 'PLACEHOLDER_POST_TASK_SURVEY_URL',
+  'post-task': 'https://usfca.qualtrics.com/jfe/form/SV_1Tu39uzfSpME1Rs',
 };
 
 app.post('/redirect-to-survey', (req, res) => {
@@ -51,8 +52,22 @@ app.post('/redirect-to-survey', (req, res) => {
     );
   }
 
+  // Start with known fields
   let surveyUrl = `${baseUrl}?participantID=${encodeURIComponent(participantID)}`;
   if (systemID) surveyUrl += `&systemID=${encodeURIComponent(systemID)}`;
+
+  // Append any extra embedded fields provided in the request body (e.g. completed, quizSubmitted, timeSpent, tabSwitchCount, quizId)
+  const extras = Object.assign({}, req.body);
+  delete extras.participantID;
+  delete extras.systemID;
+  delete extras.surveyType;
+  Object.keys(extras).forEach(k => {
+    const v = extras[k];
+    if (v !== undefined && v !== null && String(v) !== '') {
+      surveyUrl += `&${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+    }
+  });
+
   res.send(surveyUrl);
 });
 
@@ -273,6 +288,29 @@ app.delete('/notes/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/submit-quiz', async (req, res) => {
+  const { participantID, systemID, answers, tabSwitchCount, tabSwitches, timeSpent } = req.body;
+  
+  try {
+    const quiz = new Quiz({
+      participantID,
+      systemID,
+      answers,
+      tabSwitchCount,
+      tabSwitches,
+      startedAt: new Date(),
+      completedAt: new Date(),
+      timeSpent
+    });
+    
+    await quiz.save();
+    res.status(200).json({ success: true, message: 'Quiz submitted successfully', quizId: quiz._id });
+  } catch (error) {
+    console.error('Error submitting quiz:', error);
+    res.status(500).json({ error: 'Failed to submit quiz' });
   }
 });
 

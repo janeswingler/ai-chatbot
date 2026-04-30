@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Task Quiz</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)'], ['$', '$']],
+        displayMath: [['\\[', '\\]'], ['$$', '$$']]
+      },
+      startup: { typeset: false }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <script type="module" src="https://unpkg.com/mathlive"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.2/math.min.js"></script>
+  <style>
+    body.quiz-page {
+      background-image:
+        radial-gradient(circle at 10% 12%, #e7f5ff 0%, #f6f9ff 46%),
+        radial-gradient(circle at 92% 84%, #e6fff9 0%, transparent 42%);
+    }
+
+    .quiz-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .quiz-header {
+      background: linear-gradient(135deg, #2f80ed, #14b8a6);
+      color: white;
+      padding: 24px;
+      border-radius: 0;
+      text-align: center;
+    }
+
+    .quiz-header h1 {
+      font-size: 1.5rem;
+      margin: 0 0 8px;
+    }
+
+      .quiz-input::-webkit-outer-spin-button,
+      .quiz-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      .quiz-input[type="number"] {
+        appearance: textfield;
+        -moz-appearance: textfield;
+      }
+
+    .quiz-progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+
+    .quiz-progress-bar__fill {
+      height: 100%;
+      background: white;
+      transition: width 0.3s ease;
+    }
+
+    .tab-warning {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #dc2626;
+      color: white;
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      z-index: 1000;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from { transform: translateY(-100%); }
+      to { transform: translateY(0); }
+    }
+
+    .quiz-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 24px;
+    }
+
+    .quiz-welcome {
+      background: var(--color-surface);
+      border-radius: 14px;
+      padding: 40px;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .quiz-welcome h2 {
+      font-size: 1.8rem;
+      margin-bottom: 16px;
+      background: linear-gradient(90deg, #2f80ed 0%, #14b8a6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .quiz-warning {
+      background: #fff8e1;
+      border: 1.5px solid #f0a500;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+      color: #b07800;
+    }
+
+    .quiz-warning strong {
+      color: #d97706;
+    }
+
+    .quiz-question-container {
+      display: none;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .quiz-question-container.active {
+      display: block;
+    }
+
+    .quiz-question-text {
+      background: var(--color-surface);
+      border-radius: 14px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+
+    .quiz-question-label {
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+
+    .quiz-question-body {
+      color: var(--color-text);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .quiz-input-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .quiz-input-label {
+      font-weight: 500;
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+    }
+
+    .quiz-input {
+      padding: 12px 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: var(--font);
+    }
+
+    .quiz-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.1);
+    }
+
+    .math-panel-quiz {
+      background: rgba(255,255,255,0.88);
+      border-top: 1px solid var(--color-border);
+      margin-bottom: 24px;
+    }
+
+    .math-panel-quiz__field-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 14px 6px;
+    }
+
+    .math-panel-quiz__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .math-panel-quiz math-field {
+      border: 1.5px solid var(--color-border);
+      border-radius: 10px;
+      padding: 18px 14px;
+      background: var(--color-bg);
+      font-size: 1.45rem;
+      min-height: 120px;
+      display: block;
+      flex: 1;
+      transition: border-color 0.15s;
+    }
+
+    .math-panel-quiz math-field:focus-within {
+      border-color: var(--color-primary);
+      background: #fff;
+    }
+
+    .math-panel-quiz .sym-btn {
+      flex: 1 1 auto;
+      min-width: 48px;
+      padding: 9px 14px;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      font-size: 1.05rem;
+      cursor: pointer;
+      color: var(--color-text);
+      transition: background 0.1s, border-color 0.1s;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .math-panel-quiz .sym-btn:hover {
+      background: var(--color-primary-light);
+      border-color: var(--color-primary);
+      color: var(--color-primary-dark);
+    }
+
+    .math-symbols-quiz {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 14px 12px;
+    }
+
+    .btn-calc {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-primary-light);
+      color: var(--color-primary-dark);
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius-md);
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    .btn-calc:hover {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .math-result {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 14px;
+      background: transparent;
+      border: none;
+    }
+
+    .math-result.active {
+      display: flex;
+    }
+
+    .math-result-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    .btn-quiz-nav {
+      padding: 11px 24px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.95rem;
+    }
+
+    .btn-next {
+      background: linear-gradient(135deg, #2f80ed, #14b8a6);
+      color: white;
+    }
+
+    .btn-next:hover {
+      filter: brightness(0.98);
+      box-shadow: 0 8px 18px rgba(20, 184, 166, 0.24);
+    }
+
+    .btn-prev {
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+    }
+
+    .btn-prev:hover {
+      background: white;
+      border-color: var(--color-primary);
+    }
+
+    .btn-quiz-nav:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .quiz-counter {
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body class="quiz-page">
+  <div class="tab-warning" id="tab-warning">
+    ⚠️ Tab switch detected. Please remain on this tab during the quiz.
+  </div>
+
+  <div class="quiz-container">
+    <div class="quiz-header">
+      <h1>Post-Task Quiz</h1>
+      <div class="quiz-progress-bar">
+        <div class="quiz-progress-bar__fill" id="progress-bar"></div>
+      </div>
+    </div>
+
+    <div class="quiz-content">
+      <!-- Welcome Screen -->
+      <div class="quiz-welcome" id="welcome-screen">
+        <h2>Hello! 👋</h2>
+        <p style="font-size: 1.05rem; color: var(--color-text-muted); margin-bottom: 20px;">
+          You're about to complete a short quiz with 6 calculation questions.
+        </p>
+        <div class="quiz-warning">
+          <p><strong>Important:</strong> Please do not use AI assistants, search engines, or outside resources to answer these questions.</p>
+          <p style="margin-top: 8px;">The calculator below is provided for your work. Answer independently.</p>
+        </div>
+        <button class="btn-primary" id="start-quiz-btn" style="margin-top: 20px;">Start Quiz</button>
+      </div>
+
+      <!-- Question Container -->
+      <div id="questions-container">
+        <!-- Q1 -->
+        <div class="quiz-question-container" id="q1-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 1 of 6</div>
+            <div class="quiz-question-body">
+              Sarah borrows $5,000 from her neighbour at a simple interest rate of 10% per annum. She pays back the loan in one lump sum at the end of 2 years. What is the <strong>total interest</strong> that Sarah pays back on this loan?
+            </div>
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q1" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q1">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q1">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q1">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q1"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q1" placeholder="Enter the total interest amount" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="quiz-question-container" id="q2-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 2 of 6</div>
+            <div class="quiz-question-body">
+              Deven invests $ 30 000 into a savings account that offers a compound interest rate of 10% p.a. How much money will be in the account at the end of 3 years?
+            </div>
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q2" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q2">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q2">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q2">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q2"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q2" placeholder="Enter the interest earned" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="quiz-question-container" id="q3-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 3 of 6</div>
+            <div class="quiz-question-body">
+              Andrew invested $ 10 000 in a savings account. After 3 years the account had grown to $ 14 500. What annual interest rate did the account pay?
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q3" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q3">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q3">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q3">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q3"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q3" placeholder="Enter the number of years" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Q4 -->
+        <div class="quiz-question-container" id="q4-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 4 of 6</div>
+            <div class="quiz-question-body">
+              Question TBD
+            </div>
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q4" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q4">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q4">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q4">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q4"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q4" placeholder="Enter the principal amount" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Q5 -->
+        <div class="quiz-question-container" id="q5-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 5 of 6</div>
+            <div class="quiz-question-body">
+              A rabbit colony currently has 800 rabbits. Each year, the colony grows by 12% of the previous year's population. How many rabbits will there be after 6 years?
+            </div>
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q5" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q5">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q5">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q5">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q5"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q5" placeholder="Enter the total amount owed" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Q6 -->
+        <div class="quiz-question-container" id="q6-container">
+          <div class="quiz-question-text">
+            <div class="quiz-question-label">Question 6 of 6</div>
+            <div class="quiz-question-body">
+              Question TBD
+            </div>
+            <div class="math-panel-quiz">
+              <div class="math-panel-quiz__field-row">
+                <math-field id="math-field-q6" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
+                <div class="math-panel-quiz__actions">
+                  <button type="button" class="btn-calc calc-btn" data-question="q6">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q6">Clear</button>
+                </div>
+              </div>
+              <div class="math-result" id="math-result-q6">
+                <div class="math-result-label">= Result:</div>
+                <div class="math-result-value" id="math-result-value-q6"></div>
+              </div>
+              <div class="math-symbols-quiz">
+                <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="+" title="Plus">+</button>
+                <button class="sym-btn" data-latex="-" title="Minus">−</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+              </div>
+            </div>
+            <div class="quiz-input-field">
+              <label class="quiz-input-label">Your answer</label>
+              <input type="text" inputmode="decimal" class="quiz-input" id="answer-q6" placeholder="Enter the number of years" required />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 20px 24px; background: white; border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+      <button class="btn-quiz-nav btn-prev" id="prev-btn" style="display: none;">← Previous</button>
+      <span class="quiz-counter" id="counter">1 / 6</span>
+      <button class="btn-quiz-nav btn-next" id="next-btn">Next →</button>
+    </div>
+  </div>
+
+  <script src="quiz.js"></script>
+</body>
+</html>
