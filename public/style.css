@@ -71,11 +71,11 @@ body.login-page {
 }
 
 .login-card__header {
-  display: flex; align-items: center; gap: 0;
+  display: flex; align-items: center; gap: 16px; margin-left: -12px;
 }
 
 .login-card__logo {
-  width: 48px; height: 48px; background: rgba(255,255,255,0.1);
+  width: 64px; height: 64px; background: rgba(255,255,255,0.1);
   border-radius: var(--radius-md); display: flex; align-items: center;
   justify-content: center; flex-shrink: 0;
 }
