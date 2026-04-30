@@ -14,29 +14,16 @@ let tabSwitchCount = 0;
 let tabSwitches = [];
 let quizStartTime = null;
 let answers = { q1: null, q2: null, q3: null, q4: null, q5: null, q6: null };
-let mathStates = {};
 const initializedCalculators = new Set();
+const calculators = {};
 
-function normalizeMathExpression(rawExpression) {
-  let expression = String(rawExpression || '').trim();
-
-  expression = expression
-    .replace(/\\cdot|·/g, '*')
-    .replace(/\\div|÷/g, '/')
-    .replace(/\\left|\\right/g, '')
-    .replace(/\s+/g, '');
-
-  while (/\\sqrt\{([^{}]+)\}/.test(expression)) {
-    expression = expression.replace(/\\sqrt\{([^{}]+)\}/g, 'sqrt($1)');
-  }
-
-  while (/\\frac\{([^{}]+)\}\{([^{}]+)\}/.test(expression)) {
-    expression = expression.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
-  }
-
-  expression = expression.replace(/\^\{([^{}]+)\}/g, '^($1)');
-
-  return expression;
+function logEvent(eventType, elementName) {
+  if (!participantID) return;
+  fetch('/log-event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantID, eventType, elementName, timestamp: new Date() })
+  }).catch(() => {});
 }
 
 // ============= TAB-SWITCHING DETECTION =============
@@ -61,43 +48,196 @@ function showTabWarning() {
   }, 4000);
 }
 
-// ============= CALCULATOR FOR EACH QUESTION =============
-function initializeCalculator(questionNum) {
-  if (initializedCalculators.has(questionNum)) {
+// ============= CALCULATOR (ported from compoundify, see NOTES.md) =============
+function extractBraces(str, start) {
+  if (str[start] !== '{') return { content: '', end: start };
+  let depth = 0, i = start, content = '';
+  while (i < str.length) {
+    const ch = str[i];
+    if (ch === '{') {
+      if (depth > 0) content += ch;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) return { content, end: i };
+      content += ch;
+    } else if (depth > 0) {
+      content += ch;
+    }
+    i++;
+  }
+  return { content, end: i };
+}
+
+function extractArg(str, start) {
+  let i = start;
+  while (i < str.length && /\s/.test(str[i])) i++;
+  if (i >= str.length) return { content: '', end: i - 1 };
+  if (str[i] === '{') return extractBraces(str, i);
+  if (str[i] === '\\') {
+    let j = i + 1;
+    while (j < str.length && /[a-zA-Z]/.test(str[j])) j++;
+    return { content: str.slice(i, j), end: j - 1 };
+  }
+  return { content: str[i], end: i };
+}
+
+function latexToMathJs(latex) {
+  let result = '', i = 0;
+  const s = latex.trim();
+  while (i < s.length) {
+    if (s[i] === '\\') {
+      let j = i + 1;
+      while (j < s.length && /[a-zA-Z]/.test(s[j])) j++;
+      const cmd = s.slice(i + 1, j);
+
+      if (cmd === '') { i = j; continue; }
+
+      if (cmd === 'frac') {
+        const num = extractArg(s, j); j = num.end + 1;
+        const den = extractArg(s, j); j = den.end + 1;
+        const numMath = latexToMathJs(num.content);
+        const denMath = latexToMathJs(den.content);
+        if (!numMath.trim() || !denMath.trim()) throw new Error('Fill in placeholder');
+        result += `((${numMath})/(${denMath}))`;
+        i = j;
+      } else if (cmd === 'sqrt') {
+        if (s[j] === '[') {
+          const nEnd = s.indexOf(']', j);
+          const n = s.slice(j + 1, nEnd); j = nEnd + 1;
+          const arg = extractArg(s, j); j = arg.end + 1;
+          const argMath = latexToMathJs(arg.content);
+          const nMath   = latexToMathJs(n);
+          if (!argMath.trim() || !nMath.trim()) throw new Error('Fill in placeholder');
+          result += `nthRoot(${argMath},${nMath})`; i = j;
+        } else {
+          const arg = extractArg(s, j); j = arg.end + 1;
+          const argMath = latexToMathJs(arg.content);
+          if (!argMath.trim()) throw new Error('Fill in placeholder');
+          result += `sqrt(${argMath})`; i = j;
+        }
+      } else if (cmd === 'placeholder') {
+        if (s[j] === '[') { const close = s.indexOf(']', j); j = close === -1 ? j + 1 : close + 1; }
+        if (s[j] === '{') { const arg = extractBraces(s, j); j = arg.end + 1; }
+        i = j;
+      } else if (cmd === 'times' || cmd === 'cdot') { result += '*'; i = j; }
+      else if (cmd === 'div') { result += '/';  i = j; }
+      else if (cmd === 'left' || cmd === 'right') { i = j; }
+      else { throw new Error('Unsupported: \\' + cmd); }
+    } else if (s[i] === '^') {
+      if (!result.trim()) throw new Error('Fill in placeholder');
+      if (s[i + 1] === '{') {
+        const arg = extractBraces(s, i + 1);
+        const argMath = latexToMathJs(arg.content);
+        if (!argMath.trim()) throw new Error('Fill in placeholder');
+        result += `^(${argMath})`; i = arg.end + 1;
+      } else { result += '^'; i++; }
+    } else if (s[i] === '_') {
+      if (s[i + 1] === '{') {
+        const arg = extractBraces(s, i + 1);
+        i = arg.end + 1;
+      } else if (i + 1 < s.length) {
+        i += 2;
+      } else {
+        i += 1;
+      }
+    } else if (s[i] === '{') {
+      const arg = extractBraces(s, i);
+      result += `(${latexToMathJs(arg.content)})`; i = arg.end + 1;
+    } else {
+      result += s[i]; i++;
+    }
+  }
+  return result;
+}
+
+function findLastAtom(str) {
+  if (!str) return '';
+  let i = str.length;
+  while (i > 0 && /\s/.test(str[i - 1])) i--;
+  if (i === 0) return '';
+  const last = str[i - 1];
+  if (last === ')') {
+    let depth = 1, k = i - 1;
+    while (k > 0 && depth > 0) {
+      k--;
+      if (str[k] === ')') depth++;
+      else if (str[k] === '(') depth--;
+    }
+    return str.slice(k, i);
+  }
+  if (last === '}') {
+    let depth = 1, k = i - 1;
+    while (k > 0 && depth > 0) {
+      k--;
+      if (str[k] === '}') depth++;
+      else if (str[k] === '{') depth--;
+    }
+    let cmdStart = k;
+    while (cmdStart > 0 && /[a-zA-Z]/.test(str[cmdStart - 1])) cmdStart--;
+    if (cmdStart > 0 && str[cmdStart - 1] === '\\') cmdStart--;
+    return str.slice(cmdStart, i);
+  }
+  if (/[0-9a-zA-Z.]/.test(last)) {
+    let k = i - 1;
+    while (k > 0 && /[0-9a-zA-Z.]/.test(str[k - 1])) k--;
+    return str.slice(k, i);
+  }
+  return '';
+}
+
+function symButtonInsert(payload, mathField) {
+  if (!payload) return;
+  if (!payload.includes('#0')) {
+    mathField.insert(payload);
     return;
   }
+  const value = mathField.value;
+  const atom = findLastAtom(value);
+  if (atom) {
+    const before = value.slice(0, value.length - atom.length);
+    mathField.value = before;
+    mathField.executeCommand('moveToMathFieldEnd');
+    mathField.insert(payload.replace(/#0/g, atom));
+  } else {
+    mathField.insert(payload.replace(/#0/g, '#?'));
+  }
+}
+
+function hideMathLiveToolbar(mathField) {
+  if (!mathField.shadowRoot) return;
+  if (mathField.shadowRoot.querySelector('#no-vkb')) return;
+  const s = document.createElement('style');
+  s.id = 'no-vkb';
+  s.textContent = `
+    .ML__virtual-keyboard-toggle,
+    [part="virtual-keyboard-toggle"],
+    [part="menu-toggle"],
+    .ML__menu-toggle,
+    .ML__toolbar { display: none !important; }
+  `;
+  mathField.shadowRoot.appendChild(s);
+}
+
+function initializeCalculator(questionNum) {
+  if (initializedCalculators.has(questionNum)) return;
   initializedCalculators.add(questionNum);
 
-  const mathField = document.getElementById(`math-field-q${questionNum}`);
-  const calcBtn = document.querySelector(`.calc-btn[data-question="q${questionNum}"]`);
-  const clearBtn = document.querySelector(`.clear-btn[data-question="q${questionNum}"]`);
-  const resultDiv = document.getElementById(`math-result-q${questionNum}`);
-  const resultValue = document.getElementById(`math-result-value-q${questionNum}`);
+  const mathField    = document.getElementById(`math-field-q${questionNum}`);
+  const calcBtn      = document.querySelector(`.calc-btn[data-question="q${questionNum}"]`);
+  const clearBtn     = document.querySelector(`.clear-btn[data-question="q${questionNum}"]`);
+  const resultDiv    = document.getElementById(`math-result-q${questionNum}`);
+  const resultValue  = document.getElementById(`math-result-value-q${questionNum}`);
+  const panel        = mathField.closest('.math-panel-quiz');
+  const container    = document.getElementById(`q${questionNum}-container`);
 
-  function hideMathLiveToolbar() {
-    if (!mathField.shadowRoot) return;
-    if (mathField.shadowRoot.querySelector('#no-vkb')) return;
-    const style = document.createElement('style');
-    style.id = 'no-vkb';
-    style.textContent = `
-      .ML__virtual-keyboard-toggle,
-      [part="virtual-keyboard-toggle"],
-      [part="menu-toggle"],
-      .ML__menu-toggle,
-      .ML__toolbar { display: none !important; }
-    `;
-    mathField.shadowRoot.appendChild(style);
-  }
-
-  // Initialize math field state
-  if (!mathStates[questionNum]) {
-    mathStates[questionNum] = { expression: '', result: null };
-  }
+  let lastResultLatex = '';
+  let suppressInputClear = false;
 
   customElements.whenDefined('math-field').then(() => {
-    mathField.mathVirtualKeyboardPolicy = 'manual';
-    requestAnimationFrame(hideMathLiveToolbar);
-    mathField.addEventListener('focus', hideMathLiveToolbar);
+    mathField.mathVirtualKeyboardPolicy = 'off';
+    requestAnimationFrame(() => hideMathLiveToolbar(mathField));
+    mathField.addEventListener('focus', () => hideMathLiveToolbar(mathField));
   });
 
   mathField.addEventListener('focusin', () => {
@@ -106,109 +246,129 @@ function initializeCalculator(questionNum) {
   mathField.addEventListener('virtual-keyboard-toggle', () => {
     if (window.mathVirtualKeyboard) window.mathVirtualKeyboard.visible = false;
   });
-  window.addEventListener('virtual-keyboard-toggle', () => {
-    if (window.mathVirtualKeyboard) window.mathVirtualKeyboard.visible = false;
-  });
 
-  calcBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    // Prefer MathLive's LaTeX output when available, otherwise use the field value
-    let rawValue = mathField && typeof mathField.getValue === 'function'
-      ? mathField.getValue('latex')
-      : (mathField.value || '');
+  function showResult(latexOut) {
+    lastResultLatex = latexOut;
+    resultValue.innerHTML = `\\(${latexOut}\\)`;
+    resultDiv.classList.add('active');
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([resultValue]);
+  }
 
-    // Strip common LaTeX delimiters if present
-    rawValue = rawValue.replace(/^\$+/, '').replace(/\$+$/, '');
-    rawValue = rawValue.replace(/^\\\(|\\\)$/, '');
+  function showError(message) {
+    lastResultLatex = '';
+    resultValue.textContent = message;
+    resultDiv.classList.add('active');
+  }
 
-    // Normalize the MathLive output to a math.js-friendly expression
-    let expression = normalizeMathExpression(rawValue);
-    if (!expression) return;
-
-    // Additional unicode replacements
-    expression = expression
-      .replace(/√\s*([0-9.()]+)/g, 'sqrt($1)')
-      .replace(/[×✕✖]/g, '*')
-      .replace(/[−–—]/g, '-')
-      .replace(/²/g, '^2')
-      .replace(/³/g, '^3')
-      .replace(/\u2062/g, '*'); // invisible times
-
-    // Debug: log raw and normalized expression for troubleshooting
-    console.log('[quiz] calc raw:', rawValue, '-> normalized:', expression);
-
+  function runCalculate() {
+    const latex = mathField.value;
+    if (!latex) return;
     try {
-      const result = math.evaluate(expression);
-      const formatted = math.format(result, { precision: 10 });
-      mathStates[questionNum].result = formatted;
-      resultValue.textContent = formatted;
-      resultDiv.classList.add('active');
-    } catch (err) {
-      // Try a looser fallback: strip non-ascii and re-evaluate
+      const expr = latexToMathJs(latex);
+      if (!expr.trim()) throw new Error('Fill in placeholder');
+
+      const raw = math.evaluate(expr);
+      const formatted = math.format(raw, { precision: 10 });
+
+      let latexOut;
       try {
-        const alt = expression.replace(/[^\x00-\x7F]/g, ''); // strip remaining non-ascii
-        console.log('[quiz] fallback alt:', alt);
-        const result = math.evaluate(alt);
-        const formatted = math.format(result, { precision: 10 });
-        mathStates[questionNum].result = formatted;
-        resultValue.textContent = formatted;
-        resultDiv.classList.add('active');
-      } catch (err2) {
-        // Sqrt-specific fallback: if expression is sqrt(number)
-        try {
-          const m = expression.match(/^\s*sqrt\(([^)]+)\)\s*$/i);
-          if (m) {
-            const n = parseFloat(m[1]);
-            if (!Number.isNaN(n)) {
-              const r = Math.sqrt(n);
-              const formatted = math.format(r, { precision: 10 });
-              mathStates[questionNum].result = formatted;
-              resultValue.textContent = formatted;
-              resultDiv.classList.add('active');
-              return;
-            }
-          }
-        } catch (err3) {
-          console.warn('[quiz] sqrt fallback error', err3);
-        }
-
-        console.warn('[quiz] calc errors', err, err2);
-        resultValue.textContent = 'Error in calculation';
-        resultDiv.classList.add('active');
+        latexOut = (raw && typeof raw.toTex === 'function')
+          ? raw.toTex({ precision: 10 })
+          : math.parse(formatted).toTex({ parenthesis: 'auto' });
+      } catch (_) {
+        latexOut = String(formatted);
       }
+      showResult(latexOut);
+    } catch (e) {
+      showError((e && e.message) ? e.message : 'Cannot evaluate');
     }
+  }
+
+  calcBtn.addEventListener('click', () => {
+    logEvent('click', `Math Calculate (q${questionNum})`);
+    runCalculate();
   });
 
-  clearBtn.addEventListener('click', (e) => {
-    e.preventDefault();
+  clearBtn.addEventListener('click', () => {
+    logEvent('click', `Math Clear (q${questionNum})`);
     mathField.value = '';
-    mathStates[questionNum].expression = '';
-    mathStates[questionNum].result = null;
     resultDiv.classList.remove('active');
+    lastResultLatex = '';
+    mathField.focus();
   });
 
-  // Keyboard support: Enter to calculate
   mathField.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
+      logEvent('keypress', `Math Field Return (q${questionNum})`);
+      suppressInputClear = true;
       calcBtn.click();
     }
   });
 
-  // Symbol button handling - insert LaTeX into math field
-  const questionContainer = document.getElementById(`q${questionNum}-container`);
-  const symBtns = questionContainer.querySelectorAll('.sym-btn');
+  mathField.addEventListener('input', () => {
+    if (suppressInputClear) {
+      suppressInputClear = false;
+      return;
+    }
+    resultDiv.classList.remove('active');
+    lastResultLatex = '';
+  });
+
+  if (panel) {
+    panel.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button, .math-symbols-quiz')) return;
+      if (e.target === mathField) return;
+      mathField.focus();
+    });
+  }
+
+  const symBtns = container.querySelectorAll('.math-symbols-quiz .sym-btn');
   symBtns.forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      const latex = btn.dataset.latex;
-      if (latex) {
-        mathField.insert(latex);
-        mathField.focus();
+      const label = btn.textContent.trim();
+      logEvent('click', `Math Symbol: ${label} (q${questionNum})`);
+      if (btn.dataset.negate) {
+        const value = mathField.value;
+        const atom = findLastAtom(value);
+        if (atom) {
+          const before = value.slice(0, value.length - atom.length);
+          mathField.value = before + '-' + atom;
+          mathField.executeCommand('moveToMathFieldEnd');
+        } else {
+          mathField.insert('-');
+        }
+      } else if (btn.dataset.cmd) {
+        mathField.executeCommand(btn.dataset.cmd);
+      } else if (btn.dataset.latex) {
+        symButtonInsert(btn.dataset.latex, mathField);
       }
+      mathField.focus();
     });
   });
+
+  calculators[questionNum] = { mathField, resultDiv, clear: () => clearBtn.click() };
 }
+
+// Global Option+C clears the active question's math field. Capture phase + e.code
+// so we beat MathLive's listener and stay layout-independent on Mac.
+function sweepStrayDeadKey(mathField) {
+  const v = mathField.value;
+  if (v === 'ˆ' || v === 'ç' || v === '˙' || v === 'ø') mathField.value = '';
+}
+window.addEventListener('keydown', (e) => {
+  if (!e.altKey) return;
+  if (e.code !== 'KeyC') return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const active = calculators[currentQuestion + 1];
+  if (!active) return;
+  logEvent('keypress', `Math Option+C (q${currentQuestion + 1})`);
+  active.clear();
+  setTimeout(() => sweepStrayDeadKey(active.mathField), 0);
+}, { capture: true });
 
 // ============= QUIZ NAVIGATION =============
 const welcomeScreen = document.getElementById('welcome-screen');
@@ -227,7 +387,7 @@ startBtn.addEventListener('click', () => {
 
 nextBtn.addEventListener('click', () => {
   const answer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
-  
+
   if (!answer) {
     alert('Please enter an answer before proceeding.');
     return;
@@ -246,7 +406,6 @@ nextBtn.addEventListener('click', () => {
 });
 
 prevBtn.addEventListener('click', () => {
-  // Save current answer before going back
   const answer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
   if (answer) {
     answers[`q${currentQuestion + 1}`] = parseFloat(answer);
@@ -260,24 +419,19 @@ prevBtn.addEventListener('click', () => {
 });
 
 function showQuestion(index) {
-  // Hide all questions
   document.querySelectorAll('.quiz-question-container').forEach(el => {
     el.classList.remove('active');
   });
 
-  // Show current question
   document.getElementById(`q${index + 1}-container`).classList.add('active');
 
-  // Update counter and progress bar
   counterSpan.textContent = `${index + 1} / ${totalQuestions}`;
   const progress = ((index + 1) / totalQuestions) * 100;
   progressBar.style.width = progress + '%';
 
-  // Update button states
   prevBtn.style.display = index > 0 ? 'block' : 'none';
   nextBtn.textContent = index === totalQuestions - 1 ? 'Submit Quiz' : 'Next →';
 
-  // Scroll to top
   document.querySelector('.quiz-content').scrollTop = 0;
 }
 
@@ -288,7 +442,6 @@ async function submitQuiz() {
     answers[`q${currentQuestion + 1}`] = parseFloat(currentAnswer);
   }
 
-  // Validate all answers are filled
   const unanswered = Object.values(answers).filter(v => v === null).length;
   if (unanswered > 0) {
     alert('Please answer all questions before submitting.');
@@ -317,7 +470,6 @@ async function submitQuiz() {
 
     const payload = await res.json().catch(() => ({}));
 
-    // Log event
     await fetch('/log-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -329,8 +481,6 @@ async function submitQuiz() {
       })
     }).catch(() => {});
 
-    // Redirect back to the study workflow and pass embedded data so the workflow
-    // can mark the quiz step complete and receive metadata about the quiz.
     const qs = new URLSearchParams();
     qs.set('participantID', participantID);
     if (systemID) qs.set('systemID', systemID);
@@ -340,7 +490,6 @@ async function submitQuiz() {
     qs.set('tabSwitchCount', String(tabSwitchCount));
     if (payload && payload.quizId) qs.set('quizId', String(payload.quizId));
 
-    // Use replace to avoid back-button confusion
     window.location.replace(`/study-workflow.html?${qs.toString()}`);
   } catch (err) {
     console.error('Quiz submission error:', err);

@@ -244,8 +244,8 @@
     }
 
     .math-symbols-quiz {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
       gap: 6px;
       padding: 6px 14px 12px;
     }
@@ -373,8 +373,8 @@
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q1" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q1">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q1">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q1">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q1">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q1">
@@ -383,14 +383,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
@@ -411,8 +416,8 @@
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q2" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q2">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q2">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q2">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q2">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q2">
@@ -421,14 +426,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
@@ -444,13 +454,13 @@
             <div class="quiz-question-label">Question 3 of 6</div>
             <div class="quiz-question-body">
               Andrew invested $ 10 000 in a savings account. After 3 years the account had grown to $ 14 500. What annual interest rate did the account pay?
-                </div>
-                <div class="math-panel-quiz">
+            </div>
+            <div class="math-panel-quiz">
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q3" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q3">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q3">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q3">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q3">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q3">
@@ -459,14 +469,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
@@ -487,8 +502,8 @@
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q4" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q4">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q4">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q4">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q4">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q4">
@@ -497,14 +512,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
@@ -525,8 +545,8 @@
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q5" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q5">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q5">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q5">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q5">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q5">
@@ -535,14 +555,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
@@ -563,8 +588,8 @@
               <div class="math-panel-quiz__field-row">
                 <math-field id="math-field-q6" math-virtual-keyboard-policy="manual" style="flex:1; min-width:0;"></math-field>
                 <div class="math-panel-quiz__actions">
-                  <button type="button" class="btn-calc calc-btn" data-question="q6">=&nbsp;Calculate</button>
-                  <button type="button" class="btn-ghost btn-sm clear-btn" data-question="q6">Clear</button>
+                  <button type="button" class="btn-calc calc-btn" title="Evaluate expression (Return)" data-question="q6">=&nbsp;Calculate</button>
+                  <button type="button" class="btn-ghost btn-sm clear-btn" title="Clear the math field (Option+C)" data-question="q6">Clear</button>
                 </div>
               </div>
               <div class="math-result" id="math-result-q6">
@@ -573,14 +598,19 @@
               </div>
               <div class="math-symbols-quiz">
                 <button class="sym-btn" data-latex="\frac{#0}{\placeholder{}}" title="Fraction">a/b</button>
-                <button class="sym-btn" data-latex="^{2}" title="Square">x²</button>
-                <button class="sym-btn" data-latex="^{3}" title="Cube">x³</button>
-                <button class="sym-btn" data-latex="#0^{#?}" title="Power">xⁿ</button>
+                <button class="sym-btn" data-latex="^{2}" title="Square (attaches to value on the left)">x²</button>
+                <button class="sym-btn" data-latex="^{3}" title="Cube (attaches to value on the left)">x³</button>
+                <button class="sym-btn" data-latex="#0^{#?}" title="Power (attaches to value on the left)">xⁿ</button>
                 <button class="sym-btn" data-latex="\sqrt{#0}" title="Square root">√</button>
+                <button class="sym-btn" data-latex="\sqrt[\placeholder{}]{#0}" title="Nth root">ⁿ√</button>
                 <button class="sym-btn" data-latex="+" title="Plus">+</button>
                 <button class="sym-btn" data-latex="-" title="Minus">−</button>
-                <button class="sym-btn" data-latex="\cdot" title="Multiply">×</button>
+                <button class="sym-btn" data-latex="\cdot" title="Multiply">*</button>
                 <button class="sym-btn" data-latex="\div" title="Divide">÷</button>
+                <button class="sym-btn" data-latex="(" title="Left parenthesis">(</button>
+                <button class="sym-btn" data-latex=")" title="Right parenthesis">)</button>
+                <button class="sym-btn" data-negate="1" title="Place a unary minus in front of the value to the left">(-)</button>
+                <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
               </div>
             </div>
             <div class="quiz-input-field">
