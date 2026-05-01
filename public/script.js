@@ -86,7 +86,7 @@ if (prototypeBtn) {
     markStepComplete('prototype');
     const dest = String(systemID) === '1'
       ? `/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
-      : `https://compoundify.onrender.com?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
+      : `http://localhost:3001?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
     window.location.href = dest;
   });
 }

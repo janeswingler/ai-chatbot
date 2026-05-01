@@ -376,6 +376,7 @@ const startBtn = document.getElementById('start-quiz-btn');
 const counterSpan = document.getElementById('counter');
 const progressBar = document.getElementById('progress-bar');
 const answerInputs = Array.from({ length: totalQuestions }, (_, index) => document.getElementById(`answer-q${index + 1}`));
+const nextQuestionBtns = Array.from(document.querySelectorAll('.quiz-next-question-btn'));
 
 function saveCurrentAnswer() {
   const answerField = document.getElementById(`answer-q${currentQuestion + 1}`);
@@ -419,6 +420,15 @@ startBtn.addEventListener('click', () => {
   document.getElementById('answer-q1').focus();
 });
 
+nextQuestionBtns.forEach((button) => {
+  button.addEventListener('click', () => {
+    const questionNumber = Number(button.dataset.question);
+    if (Number.isFinite(questionNumber) && questionNumber === currentQuestion + 1) {
+      advanceQuestion();
+    }
+  });
+});
+
 answerInputs.forEach((input, index) => {
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -444,6 +454,11 @@ function showQuestion(index) {
 
   // Scroll to top
   document.querySelector('.quiz-content').scrollTop = 0;
+
+  nextQuestionBtns.forEach((button) => {
+    const questionNumber = Number(button.dataset.question);
+    button.style.display = questionNumber === index + 1 ? 'inline-flex' : 'none';
+  });
 
   const activeAnswer = document.getElementById(`answer-q${index + 1}`);
   if (activeAnswer) {

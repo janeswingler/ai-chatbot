@@ -551,6 +551,11 @@ body.workflow-page {
   box-shadow: 0 8px 40px rgba(0,0,0,0.10); padding: 48px 44px 44px;
   width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 28px;
 }
+
+.workflow-card.task-card {
+  max-width: 760px;
+}
+
 .workflow-card h1 {
   font-family: var(--font-display); font-size: 1.5rem; font-weight: 800;
   background: linear-gradient(90deg, #14b8a6 0%, #2f80ed 60%);
@@ -559,6 +564,27 @@ body.workflow-page {
 .workflow-card ol { padding-left: 20px; display: flex; flex-direction: column; gap: 16px; }
 .workflow-card li { font-size: 0.95rem; color: var(--color-text-muted); }
 .workflow-card li .btn-primary { margin-top: 8px; }
+
+.task-description {
+  background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+  border: 1px solid #d9e6f8;
+  border-radius: 16px;
+  padding: 26px 26px 24px;
+  color: var(--color-text-muted);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  text-align: center;
+}
+
+.task-description p {
+  font-size: 1.18rem;
+  line-height: 1.85;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.task-description p + p {
+  margin-top: 14px;
+}
 
 .task-back-btn {
   align-self: center;

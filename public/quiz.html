@@ -185,6 +185,16 @@
       box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.1);
     }
 
+    .quiz-next-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 22px;
+    }
+
+    .quiz-next-btn {
+      min-width: 180px;
+    }
+
     .math-panel-quiz {
       background: rgba(255,255,255,0.88);
       border-top: 1px solid var(--color-border);
@@ -405,6 +415,9 @@
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q1" placeholder="Enter the total interest amount" required />
             </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="1">Next Question</button>
+            </div>
           </div>
         </div>
 
@@ -447,6 +460,9 @@
             <div class="quiz-input-field">
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q2" placeholder="Enter the interest earned" required />
+            </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="2">Next Question</button>
             </div>
           </div>
         </div>
@@ -491,6 +507,9 @@
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q3" placeholder="Enter the number of years" required />
             </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="3">Next Question</button>
+            </div>
           </div>
         </div>
 
@@ -533,6 +552,9 @@
             <div class="quiz-input-field">
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q4" placeholder="Enter the principal amount" required />
+            </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="4">Next Question</button>
             </div>
           </div>
         </div>
@@ -577,6 +599,9 @@
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q5" placeholder="Enter the total amount owed" required />
             </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="5">Next Question</button>
+            </div>
           </div>
         </div>
 
@@ -619,6 +644,9 @@
             <div class="quiz-input-field">
               <label class="quiz-input-label">Your answer</label>
               <input type="text" inputmode="decimal" class="quiz-input" id="answer-q6" placeholder="Enter the number of years" required />
+            </div>
+            <div class="quiz-next-row">
+              <button type="button" class="btn-primary quiz-next-btn quiz-next-question-btn" data-question="6">Submit Quiz</button>
             </div>
           </div>
         </div>
