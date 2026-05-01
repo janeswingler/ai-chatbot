@@ -17,7 +17,18 @@
         To do: Description of the task
       </p>
     </div>
+    <a id="back-to-workflow" class="btn-primary task-back-btn" href="/study-workflow.html">
+      Back to Workflow
+    </a>
   </div>
   <script src="script.js"></script>
+  <script>
+    const backToWorkflow = document.getElementById('back-to-workflow');
+    const workflowParams = new URLSearchParams(window.location.search);
+    const workflowQuery = workflowParams.toString();
+    if (workflowQuery) {
+      backToWorkflow.href = `/study-workflow.html?${workflowQuery}`;
+    }
+  </script>
 </body>
 </html>

@@ -560,6 +560,14 @@ body.workflow-page {
 .workflow-card li { font-size: 0.95rem; color: var(--color-text-muted); }
 .workflow-card li .btn-primary { margin-top: 8px; }
 
+.task-back-btn {
+  align-self: center;
+  min-width: 200px;
+  padding: 13px 22px;
+  font-size: 0.98rem;
+  text-decoration: none;
+}
+
 .step-badge {
   display: none;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;

@@ -213,27 +213,33 @@ function initializeCalculator(questionNum) {
 // ============= QUIZ NAVIGATION =============
 const welcomeScreen = document.getElementById('welcome-screen');
 const startBtn = document.getElementById('start-quiz-btn');
-const nextBtn = document.getElementById('next-btn');
-const prevBtn = document.getElementById('prev-btn');
 const counterSpan = document.getElementById('counter');
 const progressBar = document.getElementById('progress-bar');
+const answerInputs = Array.from({ length: totalQuestions }, (_, index) => document.getElementById(`answer-q${index + 1}`));
 
-startBtn.addEventListener('click', () => {
-  quizStartTime = new Date();
-  welcomeScreen.style.display = 'none';
-  showQuestion(0);
-  initializeCalculator(1);
-});
+function saveCurrentAnswer() {
+  const answerField = document.getElementById(`answer-q${currentQuestion + 1}`);
+  const answer = answerField.value.trim();
 
-nextBtn.addEventListener('click', () => {
-  const answer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
-  
   if (!answer) {
-    alert('Please enter an answer before proceeding.');
-    return;
+    alert('Please enter an answer before continuing.');
+    return false;
   }
 
-  answers[`q${currentQuestion + 1}`] = parseFloat(answer);
+  const parsedAnswer = parseFloat(answer);
+  if (!Number.isFinite(parsedAnswer)) {
+    alert('Please enter a valid number before continuing.');
+    return false;
+  }
+
+  answers[`q${currentQuestion + 1}`] = parsedAnswer;
+  return true;
+}
+
+function advanceQuestion() {
+  if (!saveCurrentAnswer()) {
+    return;
+  }
 
   if (currentQuestion < totalQuestions - 1) {
     currentQuestion++;
@@ -243,20 +249,26 @@ nextBtn.addEventListener('click', () => {
   } else {
     submitQuiz();
   }
+}
+
+startBtn.addEventListener('click', () => {
+  quizStartTime = new Date();
+  welcomeScreen.style.display = 'none';
+  showQuestion(0);
+  initializeCalculator(1);
+  document.getElementById('answer-q1').focus();
 });
 
-prevBtn.addEventListener('click', () => {
-  // Save current answer before going back
-  const answer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
-  if (answer) {
-    answers[`q${currentQuestion + 1}`] = parseFloat(answer);
-  }
+answerInputs.forEach((input, index) => {
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
 
-  if (currentQuestion > 0) {
-    currentQuestion--;
-    showQuestion(currentQuestion);
-    initializeCalculator(currentQuestion + 1);
-  }
+      if (index === currentQuestion) {
+        advanceQuestion();
+      }
+    }
+  });
 });
 
 function showQuestion(index) {
@@ -273,24 +285,30 @@ function showQuestion(index) {
   const progress = ((index + 1) / totalQuestions) * 100;
   progressBar.style.width = progress + '%';
 
-  // Update button states
-  prevBtn.style.display = index > 0 ? 'block' : 'none';
-  nextBtn.textContent = index === totalQuestions - 1 ? 'Submit Quiz' : 'Next →';
-
   // Scroll to top
   document.querySelector('.quiz-content').scrollTop = 0;
+
+  const activeAnswer = document.getElementById(`answer-q${index + 1}`);
+  if (activeAnswer) {
+    requestAnimationFrame(() => activeAnswer.focus());
+  }
 }
 
 // ============= QUIZ SUBMISSION =============
 async function submitQuiz() {
   const currentAnswer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
   if (currentAnswer) {
-    answers[`q${currentQuestion + 1}`] = parseFloat(currentAnswer);
+    const parsedAnswer = parseFloat(currentAnswer);
+    if (!Number.isFinite(parsedAnswer)) {
+      alert('Please enter a valid number before submitting.');
+      return;
+    }
+    answers[`q${currentQuestion + 1}`] = parsedAnswer;
   }
 
   // Validate all answers are filled
-  const unanswered = Object.values(answers).filter(v => v === null).length;
-  if (unanswered > 0) {
+  const invalidAnswers = Object.values(answers).filter(v => v === null || !Number.isFinite(v)).length;
+  if (invalidAnswers > 0) {
     alert('Please answer all questions before submitting.');
     return;
   }
