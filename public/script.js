@@ -933,34 +933,7 @@ function scrollChat() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-document.getElementById('upload-doc-btn').addEventListener('click', () => {
-  document.getElementById('file-input').click();
-});
-
-document.getElementById('file-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const btn = document.getElementById('upload-doc-btn');
-  btn.classList.add('uploading');
-  btn.title = 'Uploading…';
-  const formData = new FormData();
-  formData.append('document', file);
-  try {
-    const res = await fetch('/upload-document', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      appendBotMessage(`Document uploaded: **${data.filename}** (${data.chunkCount} chunks). You can now ask questions about it.`);
-    } else {
-      alert('Upload failed: ' + data.error);
-    }
-  } catch (err) {
-    alert('Upload failed.');
-  } finally {
-    btn.classList.remove('uploading');
-    btn.title = 'Attach a document (PDF or TXT)';
-    e.target.value = '';
-  }
-});
+// Document uploads disabled: upload UI and handlers removed.
 
 if (userInput) {
   userInput.addEventListener('mouseover', () => logEvent('hover', 'User Input'));

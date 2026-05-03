@@ -27,10 +27,9 @@ const retrievalService = require('./services/retrievalService');
 retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
 const EventLog = require('./models/EventLog');
 const Document = require('./models/Document');
-const multer = require("multer");
 const documentProcessor = require("./services/documentProcessor");
 const embeddingService = require("./services/embeddingService");
-const upload = multer({ dest: "uploads/" });
+
 
 const SURVEY_URLS = {
   demographics: 'https://usfca.qualtrics.com/jfe/form/SV_80rjL7xUR9J6RFk',
@@ -200,35 +199,7 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-app.post("/upload-document", upload.single("document") , async (req, res) => {
-    if (! req.file ) {
-    return res.status(400).json({ error: "No file uploaded" });
-    }
-    try {
-      const processed = await documentProcessor.processDocument(req.file);
-      const chunksWithEmbeddings = await embeddingService.generateEmbeddings(processed.chunks);
-        await Document.create({
-            filename: req.file.originalname,
-            text: processed.fullText,
-            chunks: chunksWithEmbeddings.map((chunkObj) => ({
-                chunkIndex: chunkObj.chunkIndex,
-                text: chunkObj.text,
-                embedding: chunkObj.embedding || []
-            })),
-            processingStatus: "completed"
-        });
-        await retrievalService.rebuildIndex();
-        res.json({
-            status: "ok",
-            filename: req.file.originalname,
-            chunkCount: chunksWithEmbeddings.length
-        });
-        console.log(`Processed document: ${req.file.originalname}, chunks: ${chunksWithEmbeddings.length}`);
-    } catch (error) {
-        console.error("Error processing document:", error);
-        res.status(500).json({ error: "Failed to process document" });
-    }
-});
+// Document upload endpoint removed — uploads are not permitted.
 
 app.get("/documents", async (req, res) => {
     const docs = await Document.find({})
