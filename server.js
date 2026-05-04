@@ -23,6 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const Interaction = require('./models/Interaction');
 const Note = require('./models/Note');
 const Quiz = require('./models/Quiz');
+const QuizResponse = require('./models/QuizResponse');
 const retrievalService = require('./services/retrievalService');
 retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
 const EventLog = require('./models/EventLog');
@@ -264,20 +265,44 @@ app.delete('/notes/:id', async (req, res) => {
 
 app.post('/submit-quiz', async (req, res) => {
   const { participantID, systemID, answers, tabSwitchCount, tabSwitches, timeSpent } = req.body;
-  
+
   try {
+    const submittedAt = new Date();
+
     const quiz = new Quiz({
       participantID,
       systemID,
       answers,
       tabSwitchCount,
       tabSwitches,
-      startedAt: new Date(),
-      completedAt: new Date(),
+      startedAt: submittedAt,
+      completedAt: submittedAt,
       timeSpent
     });
-    
+
     await quiz.save();
+
+    const responses = Object.keys(answers || {})
+      .map(key => {
+        const match = /^q(\d+)$/i.exec(key);
+        if (!match) return null;
+        return {
+          questionNumber: Number(match[1]),
+          response: String(answers[key] ?? ''),
+          timestamp: submittedAt
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.questionNumber - b.questionNumber);
+
+    await QuizResponse.create({
+      participantID,
+      systemID,
+      quizId: quiz._id,
+      responses,
+      createdAt: submittedAt
+    });
+
     res.status(200).json({ success: true, message: 'Quiz submitted successfully', quizId: quiz._id });
   } catch (error) {
     console.error('Error submitting quiz:', error);
