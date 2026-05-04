@@ -295,7 +295,7 @@ app.post('/submit-quiz', async (req, res) => {
         return {
           questionNumber: Number(match[1]),
           response: String(answers[key] ?? ''),
-          timestamp: submittedAt
+          timestamp: quizSubmittedAt
         };
       })
       .filter(Boolean)
