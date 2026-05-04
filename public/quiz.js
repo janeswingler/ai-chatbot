@@ -378,8 +378,11 @@ const progressBar = document.getElementById('progress-bar');
 const answerInputs = Array.from({ length: totalQuestions }, (_, index) => document.getElementById(`answer-q${index + 1}`));
 const nextQuestionBtns = Array.from(document.querySelectorAll('.quiz-next-question-btn'));
 
+const NUMERIC_QUESTIONS = new Set([1, 2]);
+
 function saveCurrentAnswer() {
-  const answerField = document.getElementById(`answer-q${currentQuestion + 1}`);
+  const questionNum = currentQuestion + 1;
+  const answerField = document.getElementById(`answer-q${questionNum}`);
   const answer = answerField.value.trim();
 
   if (!answer) {
@@ -387,13 +390,16 @@ function saveCurrentAnswer() {
     return false;
   }
 
-  const parsedAnswer = parseFloat(answer);
-  if (!Number.isFinite(parsedAnswer)) {
-    alert('Please enter a valid number before continuing.');
-    return false;
+  if (NUMERIC_QUESTIONS.has(questionNum)) {
+    const parsedAnswer = parseFloat(answer);
+    if (!Number.isFinite(parsedAnswer)) {
+      alert('Please enter a valid number before continuing.');
+      return false;
+    }
+    answers[`q${questionNum}`] = parsedAnswer;
+  } else {
+    answers[`q${questionNum}`] = answer;
   }
-
-  answers[`q${currentQuestion + 1}`] = parsedAnswer;
   return true;
 }
 
@@ -468,19 +474,28 @@ function showQuestion(index) {
 
 // ============= QUIZ SUBMISSION =============
 async function submitQuiz() {
-  const currentAnswer = document.getElementById(`answer-q${currentQuestion + 1}`).value.trim();
+  const finalQuestionNum = currentQuestion + 1;
+  const currentAnswer = document.getElementById(`answer-q${finalQuestionNum}`).value.trim();
   if (currentAnswer) {
-    const parsedAnswer = parseFloat(currentAnswer);
-    if (!Number.isFinite(parsedAnswer)) {
-      alert('Please enter a valid number before submitting.');
-      return;
+    if (NUMERIC_QUESTIONS.has(finalQuestionNum)) {
+      const parsedAnswer = parseFloat(currentAnswer);
+      if (!Number.isFinite(parsedAnswer)) {
+        alert('Please enter a valid number before submitting.');
+        return;
+      }
+      answers[`q${finalQuestionNum}`] = parsedAnswer;
+    } else {
+      answers[`q${finalQuestionNum}`] = currentAnswer;
     }
-    answers[`q${currentQuestion + 1}`] = parsedAnswer;
   }
 
   // Validate all answers are filled
-  const invalidAnswers = Object.values(answers).filter(v => v === null || !Number.isFinite(v)).length;
-  if (invalidAnswers > 0) {
+  const hasInvalid = Object.entries(answers).some(([key, value]) => {
+    const qNum = Number(key.slice(1));
+    if (NUMERIC_QUESTIONS.has(qNum)) return !Number.isFinite(value);
+    return typeof value !== 'string' || value.trim() === '';
+  });
+  if (hasInvalid) {
     alert('Please answer all questions before submitting.');
     return;
   }

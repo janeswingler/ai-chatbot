@@ -36,7 +36,7 @@ const SURVEY_URLS = {
 
   'pre-task': 'https://usfca.qualtrics.com/jfe/form/SV_6wXtobIQoynMpam',
 
-  'post-task': 'https://usfca.qualtrics.com/jfe/form/SV_1Tu39uzfSpME1Rs',
+  'post-task': 'https://usfca.qualtrics.com/jfe/form/SV_0lzQIDTOazS5K2a',
 };
 
 app.post('/redirect-to-survey', (req, res) => {
