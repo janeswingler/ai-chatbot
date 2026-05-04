@@ -85,8 +85,8 @@ if (prototypeBtn) {
   prototypeBtn.addEventListener('click', () => {
     markStepComplete('prototype');
     const dest = String(systemID) === '1'
-      ? `/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
-      : `http://localhost:3001?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
+      ? `https://ai-chatbot-fv7e.onrender.com/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
+      : `https://compoundify.onrender.com/?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
     window.location.href = dest;
   });
 }
@@ -104,7 +104,27 @@ if (postTaskBtn) postTaskBtn.addEventListener('click', () => redirectToQualtrics
 
 if (document.getElementById('messages')) {
 
-document.getElementById('topbar-pid').textContent = `ID: ${participantID}`;
+const SESSION_UNLOCK_SECONDS = 10;
+const timerEl = document.getElementById('topbar-timer');
+const returnBtn = document.getElementById('topbar-return');
+const sessionStart = Date.now();
+function updateSessionTimer() {
+  const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  timerEl.textContent = `${mm}:${ss}`;
+  if (elapsed >= SESSION_UNLOCK_SECONDS && returnBtn.disabled) {
+    returnBtn.disabled = false;
+  }
+}
+updateSessionTimer();
+setInterval(updateSessionTimer, 1000);
+
+returnBtn.addEventListener('click', () => {
+  logEvent('click', 'Return Button');
+  const url = `https://ai-chatbot-fv7e.onrender.com/study-workflow.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID || '')}`;
+  window.location.href = url;
+});
 
 const RIGHT_W_KEY = 'ai_right_w';
 (function restoreColumnWidth() {
@@ -160,7 +180,6 @@ const userInput           = document.getElementById('user-input');
 const sendBtn             = document.getElementById('send-btn');
 const typingEl            = document.getElementById('typing-indicator');
 const notesList           = document.getElementById('notes-list');
-const retrievalMethodEl   = document.getElementById('retrieval-method');
 const noteComposer        = document.getElementById('note-composer');
 const noteComposerHeader  = document.getElementById('note-composer-header');
 const noteComposerTitleEl = document.getElementById('note-composer-title');
@@ -630,7 +649,7 @@ async function handleSend() {
         history: conversationHistory.slice(-10),
         input: message,
         participantID,
-        retrievalMethod: retrievalMethodEl ? retrievalMethodEl.value : 'semantic'
+        retrievalMethod: 'semantic'
       })
     });
     if (!res.ok) throw new Error('Server error');
