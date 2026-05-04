@@ -5,8 +5,8 @@ const QuizSchema = new Schema({
   participantID: String,
   systemID: String,
   answers: {
-    q1: Number,
-    q2: Number,
+    q1: String,
+    q2: String,
     q3: String,
     q4: String,
     q5: String,

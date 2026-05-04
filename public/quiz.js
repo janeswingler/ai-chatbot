@@ -378,8 +378,6 @@ const progressBar = document.getElementById('progress-bar');
 const answerInputs = Array.from({ length: totalQuestions }, (_, index) => document.getElementById(`answer-q${index + 1}`));
 const nextQuestionBtns = Array.from(document.querySelectorAll('.quiz-next-question-btn'));
 
-const NUMERIC_QUESTIONS = new Set([1, 2]);
-
 function saveCurrentAnswer() {
   const questionNum = currentQuestion + 1;
   const answerField = document.getElementById(`answer-q${questionNum}`);
@@ -390,16 +388,7 @@ function saveCurrentAnswer() {
     return false;
   }
 
-  if (NUMERIC_QUESTIONS.has(questionNum)) {
-    const parsedAnswer = parseFloat(answer);
-    if (!Number.isFinite(parsedAnswer)) {
-      alert('Please enter a valid number before continuing.');
-      return false;
-    }
-    answers[`q${questionNum}`] = parsedAnswer;
-  } else {
-    answers[`q${questionNum}`] = answer;
-  }
+  answers[`q${questionNum}`] = answer;
   return true;
 }
 
@@ -477,24 +466,11 @@ async function submitQuiz() {
   const finalQuestionNum = currentQuestion + 1;
   const currentAnswer = document.getElementById(`answer-q${finalQuestionNum}`).value.trim();
   if (currentAnswer) {
-    if (NUMERIC_QUESTIONS.has(finalQuestionNum)) {
-      const parsedAnswer = parseFloat(currentAnswer);
-      if (!Number.isFinite(parsedAnswer)) {
-        alert('Please enter a valid number before submitting.');
-        return;
-      }
-      answers[`q${finalQuestionNum}`] = parsedAnswer;
-    } else {
-      answers[`q${finalQuestionNum}`] = currentAnswer;
-    }
+    answers[`q${finalQuestionNum}`] = currentAnswer;
   }
 
   // Validate all answers are filled
-  const hasInvalid = Object.entries(answers).some(([key, value]) => {
-    const qNum = Number(key.slice(1));
-    if (NUMERIC_QUESTIONS.has(qNum)) return !Number.isFinite(value);
-    return typeof value !== 'string' || value.trim() === '';
-  });
+  const hasInvalid = Object.values(answers).some(value => typeof value !== 'string' || value.trim() === '');
   if (hasInvalid) {
     alert('Please answer all questions before submitting.');
     return;
