@@ -24,6 +24,7 @@ const Interaction = require('./models/Interaction');
 const Note = require('./models/Note');
 const Quiz = require('./models/Quiz');
 const QuizResponse = require('./models/QuizResponse');
+const StudySession = require('./models/StudySession');
 const retrievalService = require('./services/retrievalService');
 retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
 const EventLog = require('./models/EventLog');
@@ -91,10 +92,10 @@ app.post('/submit-prompt', async (req, res) => {
 });
 
 app.post('/log-event', async (req, res) => {
-  const { participantID, eventType, elementName, timestamp } = req.body;
+  const { participantID, systemID, sessionID, eventType, elementName, timestamp } = req.body;
   try {
     // Log the event to MongoDB
-    const event = new EventLog({ participantID, eventType, elementName, timestamp });
+    const event = new EventLog({ participantID, systemID: systemID || null, sessionID: sessionID || null, eventType, elementName, timestamp });
     await event.save();
     res.status(200).send('Event logged successfully');
   } catch (error) {
@@ -127,7 +128,7 @@ app.post('/history', async (req, res) => {
 
 app.post('/chat', async (req, res) => {
   try {
-    const { history = [], input: userInput, message, participantID, systemID, retrievalMethod } = req.body;
+    const { history = [], input: userInput, message, participantID, systemID, sessionID, retrievalMethod } = req.body;
     const userMessage = userInput || message;
 
     if (!participantID) {
@@ -173,6 +174,7 @@ app.post('/chat', async (req, res) => {
     const interaction = new Interaction({
       participantID,
       systemID: systemID || null,
+      sessionID: sessionID || null,
       userInput: userMessage,
       botResponse,
       retrievalMethod: retrievalMethod || 'semantic',
@@ -211,10 +213,12 @@ app.get("/documents", async (req, res) => {
 
 app.post('/notes', async (req, res) => {
   try {
-    const { participantID, title, content, topic, isFormula, messageRef, isHighlight } = req.body;
+    const { participantID, systemID, sessionID, title, content, topic, isFormula, messageRef, isHighlight } = req.body;
     if (!participantID || !content) return res.status(400).json({ error: 'Missing fields' });
     const note = new Note({
       participantID,
+      systemID: systemID || null,
+      sessionID: sessionID || null,
       title: (title || 'Untitled').trim() || 'Untitled',
       content,
       topic: topic || null,
@@ -264,19 +268,21 @@ app.delete('/notes/:id', async (req, res) => {
 });
 
 app.post('/submit-quiz', async (req, res) => {
-  const { participantID, systemID, answers, tabSwitchCount, tabSwitches, timeSpent } = req.body;
+  const { participantID, systemID, sessionID, answers, tabSwitchCount, tabSwitches, timeSpent, startedAt, completedAt } = req.body;
 
   try {
-    const submittedAt = new Date();
+    const quizStartedAt = startedAt ? new Date(startedAt) : new Date();
+    const quizSubmittedAt = completedAt ? new Date(completedAt) : new Date();
 
     const quiz = new Quiz({
       participantID,
       systemID,
+      sessionID: sessionID || null,
       answers,
       tabSwitchCount,
       tabSwitches,
-      startedAt: submittedAt,
-      completedAt: submittedAt,
+      startedAt: quizStartedAt,
+      completedAt: quizSubmittedAt,
       timeSpent
     });
 
@@ -298,15 +304,67 @@ app.post('/submit-quiz', async (req, res) => {
     await QuizResponse.create({
       participantID,
       systemID,
+      sessionID: sessionID || null,
       quizId: quiz._id,
       responses,
-      createdAt: submittedAt
+      createdAt: quizSubmittedAt
     });
 
     res.status(200).json({ success: true, message: 'Quiz submitted successfully', quizId: quiz._id });
   } catch (error) {
     console.error('Error submitting quiz:', error);
     res.status(500).json({ error: 'Failed to submit quiz' });
+  }
+});
+
+app.post('/study-session/start', async (req, res) => {
+  try {
+    const { participantID, systemID, sessionID, startedAt } = req.body;
+    if (!participantID || !sessionID) return res.status(400).json({ error: 'Missing fields' });
+
+    const existing = await StudySession.findOne({ sessionID });
+    const startTime = startedAt ? new Date(startedAt) : new Date();
+
+    if (existing) {
+      if (!existing.startedAt || existing.startedAt > startTime) existing.startedAt = startTime;
+      existing.participantID = participantID;
+      existing.systemID = systemID || existing.systemID || null;
+      await existing.save();
+      return res.json(existing);
+    }
+
+    const studySession = await StudySession.create({
+      participantID,
+      systemID: systemID || null,
+      sessionID,
+      startedAt: startTime
+    });
+
+    res.json(studySession);
+  } catch (error) {
+    console.error('Study session start error:', error);
+    res.status(500).json({ error: 'Failed to start study session' });
+  }
+});
+
+app.post('/study-session/end', async (req, res) => {
+  try {
+    const { sessionID, endedAt } = req.body;
+    if (!sessionID) return res.status(400).json({ error: 'Missing sessionID' });
+
+    const session = await StudySession.findOne({ sessionID });
+    if (!session) return res.status(404).json({ error: 'Study session not found' });
+
+    const endTime = endedAt ? new Date(endedAt) : new Date();
+    session.endedAt = endTime;
+    session.durationSec = Math.max(0, Math.round((endTime - session.startedAt) / 1000));
+    session.met20MinMinimum = session.durationSec >= 20 * 60;
+    await session.save();
+
+    res.json(session);
+  } catch (error) {
+    console.error('Study session end error:', error);
+    res.status(500).json({ error: 'Failed to end study session' });
   }
 });
 

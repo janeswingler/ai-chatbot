@@ -1,6 +1,13 @@
 const params = new URLSearchParams(window.location.search);
 const participantID = params.get('participantID') || localStorage.getItem('participantID');
 const systemID = params.get('systemID') || localStorage.getItem('systemID');
+let sessionID = params.get('sessionID') || localStorage.getItem('sessionID');
+
+if (!sessionID) {
+  sessionID = (crypto.randomUUID && crypto.randomUUID()) || `s_${Date.now()}`;
+}
+
+localStorage.setItem('sessionID', sessionID);
 
 if (!participantID) {
   alert('No participant ID found.');
@@ -11,7 +18,7 @@ function logEvent(type, element) {
   fetch('/log-event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantID, eventType: type, elementName: element, timestamp: new Date() })
+    body: JSON.stringify({ participantID, systemID, sessionID, eventType: type, elementName: element, timestamp: new Date() })
   }).catch(() => {});
 }
 
@@ -24,7 +31,7 @@ function redirectToQualtrics(surveyType) {
     if (v !== null) extras[k] = v;
   });
 
-  const body = Object.assign({ participantID, systemID, surveyType }, extras);
+  const body = Object.assign({ participantID, systemID, sessionID, surveyType }, extras);
 
   fetch('/redirect-to-survey', {
     method: 'POST',
@@ -84,9 +91,15 @@ const prototypeBtn = document.getElementById('prototype-btn');
 if (prototypeBtn) {
   prototypeBtn.addEventListener('click', () => {
     markStepComplete('prototype');
+    fetch('/study-session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ participantID, systemID, sessionID, startedAt: new Date().toISOString() })
+    }).catch(() => {});
     const dest = String(systemID) === '1'
-      ? `https://ai-chatbot-fv7e.onrender.com/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`
-      : `https://compoundify.onrender.com/?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
+      ? `https://ai-chatbot-fv7e.onrender.com/chat.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}&sessionID=${encodeURIComponent(sessionID)}`
+      : `https://compoundify.onrender.com/?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}&sessionID=${encodeURIComponent(sessionID)}`;
     window.location.href = dest;
   });
 }
@@ -95,7 +108,13 @@ const postTaskQuizBtn = document.getElementById('post-task-quiz-btn');
 if (postTaskQuizBtn) {
   postTaskQuizBtn.addEventListener('click', () => {
     markStepComplete('post-task-quiz');
-    window.location.href = `/quiz.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}`;
+    fetch('/study-session/end', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ sessionID, endedAt: new Date().toISOString() })
+    }).catch(() => {});
+    window.location.href = `/quiz.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID)}&sessionID=${encodeURIComponent(sessionID)}`;
   });
 }
 
@@ -122,7 +141,13 @@ setInterval(updateSessionTimer, 1000);
 
 returnBtn.addEventListener('click', () => {
   logEvent('click', 'Return Button');
-  const url = `https://ai-chatbot-fv7e.onrender.com/study-workflow.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID || '')}`;
+  fetch('/study-session/end', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    keepalive: true,
+    body: JSON.stringify({ sessionID, endedAt: new Date().toISOString() })
+  }).catch(() => {});
+  const url = `https://ai-chatbot-fv7e.onrender.com/study-workflow.html?participantID=${encodeURIComponent(participantID)}&systemID=${encodeURIComponent(systemID || '')}&sessionID=${encodeURIComponent(sessionID)}`;
   window.location.href = url;
 });
 
@@ -649,6 +674,8 @@ async function handleSend() {
         history: conversationHistory.slice(-10),
         input: message,
         participantID,
+        systemID,
+        sessionID,
         retrievalMethod: 'semantic'
       })
     });
@@ -750,6 +777,8 @@ async function saveNote(content, isFormula = false, messageRef = null, title = '
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         participantID,
+        systemID,
+        sessionID,
         title,
         content,
         isFormula,

@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const QuizSchema = new Schema({
   participantID: String,
   systemID: String,
+  sessionID: String,
   answers: {
     q1: String,
     q2: String,

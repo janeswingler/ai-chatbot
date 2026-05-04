@@ -12,6 +12,7 @@ const RetrievedChunkSchema = new Schema({
 const InteractionSchema = new Schema({
     participantID: String,
     systemID: String,
+    sessionID: String,
     userInput: String,
     botResponse: String,
     retrievalMethod: { type: String, enum: ['semantic', 'tfidf'], default: 'semantic' },

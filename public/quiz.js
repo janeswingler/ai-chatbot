@@ -1,6 +1,12 @@
 const params = new URLSearchParams(window.location.search);
 const participantID = params.get('participantID') || localStorage.getItem('participantID');
 const systemID = params.get('systemID') || localStorage.getItem('systemID');
+let sessionID = params.get('sessionID') || localStorage.getItem('sessionID');
+
+if (!sessionID) {
+  sessionID = (crypto.randomUUID && crypto.randomUUID()) || `s_${Date.now()}`;
+}
+localStorage.setItem('sessionID', sessionID);
 
 if (!participantID) {
   alert('No participant ID found.');
@@ -22,7 +28,7 @@ function logEvent(eventType, elementName) {
   fetch('/log-event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantID, eventType, elementName, timestamp: new Date() })
+    body: JSON.stringify({ participantID, systemID, sessionID, eventType, elementName, timestamp: new Date() })
   }).catch(() => {});
 }
 
@@ -409,6 +415,7 @@ function advanceQuestion() {
 
 startBtn.addEventListener('click', () => {
   quizStartTime = new Date();
+  logEvent('click', 'Quiz Start');
   welcomeScreen.style.display = 'none';
   showQuestion(0);
   initializeCalculator(1);
@@ -477,6 +484,8 @@ async function submitQuiz() {
   }
 
   const timeSpent = Math.round((new Date() - quizStartTime) / 1000);
+  const quizStartedAt = quizStartTime ? quizStartTime.toISOString() : new Date().toISOString();
+  const quizSubmittedAt = new Date().toISOString();
 
   try {
     const res = await fetch('/submit-quiz', {
@@ -485,10 +494,13 @@ async function submitQuiz() {
       body: JSON.stringify({
         participantID,
         systemID,
+        sessionID,
         answers,
         tabSwitchCount,
         tabSwitches,
         timeSpent,
+        startedAt: quizStartedAt,
+        completedAt: quizSubmittedAt,
       })
     });
 
@@ -503,6 +515,8 @@ async function submitQuiz() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         participantID,
+        systemID,
+        sessionID,
         eventType: 'quiz_completed',
         elementName: 'post_task_quiz',
         timestamp: new Date()
@@ -512,6 +526,7 @@ async function submitQuiz() {
     const qs = new URLSearchParams();
     qs.set('participantID', participantID);
     if (systemID) qs.set('systemID', systemID);
+    qs.set('sessionID', sessionID);
     qs.set('completed', 'post-task-quiz');
     qs.set('quizSubmitted', '1');
     qs.set('timeSpent', String(timeSpent));

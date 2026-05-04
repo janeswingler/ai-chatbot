@@ -10,6 +10,7 @@ const ResponseItemSchema = new Schema({
 const QuizResponseSchema = new Schema({
   participantID: { type: String, required: true },
   systemID: String,
+  sessionID: String,
   quizId: { type: Schema.Types.ObjectId, ref: 'Quiz' },
   responses: { type: [ResponseItemSchema], default: [] },
   createdAt: { type: Date, default: Date.now }
