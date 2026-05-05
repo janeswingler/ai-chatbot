@@ -35,6 +35,8 @@ body:not(.login-page):not(.workflow-page) {
     radial-gradient(circle at 92% 84%, #e6fff9 0%, transparent 42%);
 }
 
+#send-btn { padding: 10px 20px; font-size: 1rem; }
+
 /* Buttons */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
@@ -292,7 +294,7 @@ body.chat-page {
 /* Math panel (unified field + symbols) */
 .math-panel {
   border-top: 1px solid var(--color-border);
-  background: rgba(255,255,255,0.88); flex-shrink: 0;
+  background: #a8c4ec; flex-shrink: 0;
 }
 .math-panel__field-row {
   display: flex; align-items: flex-start; gap: 8px;
@@ -306,7 +308,7 @@ body.chat-page {
 .math-panel__actions .btn-calc { justify-content: center; }
 math-field {
   border: 1.5px solid var(--color-border); border-radius: 10px;
-  padding: 18px 14px; background: var(--color-bg);
+  padding: 18px 14px; background: #ffffff;
   font-size: 1.45rem; min-height: 120px; display: block;
   transition: border-color 0.15s;
 }
@@ -318,7 +320,7 @@ math-field:focus-within { border-color: var(--color-primary); background: #fff; 
 .sym-btn {
   flex: 1 1 auto; min-width: 48px;
   padding: 9px 14px;
-  background: var(--color-bg); border: 1px solid var(--color-border);
+  background: #ffffff; border: 1px solid var(--color-border);
   border-radius: 8px; font-size: 1.05rem; cursor: pointer;
   color: var(--color-text); transition: background 0.1s, border-color 0.1s;
   white-space: nowrap;
@@ -333,8 +335,8 @@ math-field:focus-within { border-color: var(--color-primary); background: #fff; 
 
 .btn-calc {
   display: inline-flex; align-items: center;
-  background: var(--color-primary-light); color: var(--color-primary-dark);
-  border: 1px solid var(--color-primary); border-radius: var(--radius-md);
+  background: var(--color-primary-dark); color: #ffffff;
+  border: 1px solid var(--color-primary-dark); border-radius: var(--radius-md);
   padding: 5px 12px; font-size: 0.78rem; font-weight: 600;
   white-space: nowrap; transition: background 0.15s;
 }
@@ -342,7 +344,7 @@ math-field:focus-within { border-color: var(--color-primary); background: #fff; 
 
 .math-result {
   display: flex; align-items: center; gap: 12px;
-  padding: 14px 14px 16px; border-top: 1px solid var(--color-bg);
+  padding: 14px 14px 16px; border-top: 1px solid rgba(0,0,0,0.08);
   background: #f0fdf4;
 }
 .math-result__eq {
@@ -372,7 +374,7 @@ math-field:focus-within { border-color: var(--color-primary); background: #fff; 
 
 /* Input row */
 .input-row {
-  padding: 12px 16px; border-top: 1px solid var(--color-border);
+  padding: 14px 18px; border-top: 1px solid var(--color-border);
   display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
   background: rgba(255,255,255,0.9);
 }
@@ -395,8 +397,8 @@ math-field:focus-within { border-color: var(--color-primary); background: #fff; 
 @keyframes spin { to { transform: rotate(360deg); } }
 
 #user-input {
-  flex: 1; padding: 10px 14px; border: 1.5px solid var(--color-border);
-  border-radius: 12px; font-size: 0.875rem; color: var(--color-text);
+  flex: 1; padding: 12px 16px; border: 1.5px solid var(--color-border);
+  border-radius: 12px; font-size: 1rem; color: var(--color-text);
   background: var(--color-bg); outline: none; resize: none; line-height: 1.5;
   transition: border-color 0.15s, box-shadow 0.15s;
 }

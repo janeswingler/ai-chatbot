@@ -48,6 +48,21 @@
         <span></span><span></span><span></span>
       </div>
 
+      <!-- Input row -->
+      <form class="input-row" onsubmit="return false;" id="input-form">
+        <div class="input-body">
+          <div id="math-chips" class="math-chips" style="display:none"></div>
+          <label class="sr-only" for="user-input">Type a message</label>
+          <textarea id="user-input" rows="1" placeholder="Ask a question or type your working…" autocomplete="off"></textarea>
+        </div>
+        <div class="input-actions">
+          <button type="button" class="btn-ghost btn-minimise" id="math-toggle-btn" title="Minimise math panel">
+            <svg id="math-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button type="submit" class="btn-primary" id="send-btn">Send</button>
+        </div>
+      </form>
+
       <!-- Math panel (field + symbol shortcuts, one unified panel) -->
       <div class="math-panel" id="math-panel">
         <div class="math-panel__field-row">
@@ -79,21 +94,6 @@
           <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
         </div>
       </div>
-
-      <!-- Input row -->
-      <form class="input-row" onsubmit="return false;" id="input-form">
-        <div class="input-body">
-          <div id="math-chips" class="math-chips" style="display:none"></div>
-          <label class="sr-only" for="user-input">Type a message</label>
-          <textarea id="user-input" rows="1" placeholder="Ask a question or type your working…" autocomplete="off"></textarea>
-        </div>
-        <div class="input-actions">
-          <button type="button" class="btn-ghost btn-minimise" id="math-toggle-btn" title="Minimise math panel">
-            <svg id="math-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-          </button>
-          <button type="submit" class="btn-primary" id="send-btn">Send</button>
-        </div>
-      </form>
     </main>
 
     <div class="col-resizer" id="resizer-right" title="Drag to resize"></div>
