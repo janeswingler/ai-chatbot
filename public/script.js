@@ -731,23 +731,6 @@ function appendBotMessage(text, retrievedChunks, confidence, retrievalMethodUsed
   wrap.appendChild(bubble);
   messagesEl.appendChild(wrap);
 
-  // RAG evidence display
-  if (retrievedChunks && retrievedChunks.length > 0) {
-    const evidence = document.createElement('div');
-    evidence.className = 'rag-evidence';
-    const label = document.createElement('div');
-    label.className = 'rag-evidence__label';
-    label.textContent = `${retrievalMethodUsed || 'semantic'} — top: ${confidence?.topScore?.toFixed(2) ?? 'n/a'}, chunks: ${confidence?.chunkCount ?? 0}`;
-    evidence.appendChild(label);
-    retrievedChunks.forEach((chunk, i) => {
-      const chunkEl = document.createElement('div');
-      chunkEl.className = 'rag-evidence__chunk';
-      chunkEl.textContent = `[${i + 1}] ${chunk.documentName}: ${chunk.chunkText.slice(0, 80)}…`;
-      evidence.appendChild(chunkEl);
-    });
-    messagesEl.appendChild(evidence);
-  }
-
   scrollChat();
 }
 
