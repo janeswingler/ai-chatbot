@@ -1,12 +1,16 @@
 const params = new URLSearchParams(window.location.search);
-const participantID = params.get('participantID') || localStorage.getItem('participantID');
+const urlParticipantID = params.get('participantID');
+const storedParticipantID = localStorage.getItem('participantID');
+const participantID = urlParticipantID || storedParticipantID;
 const systemID = params.get('systemID') || localStorage.getItem('systemID');
 let sessionID = params.get('sessionID') || localStorage.getItem('sessionID');
+const participantChanged = !!urlParticipantID && urlParticipantID !== storedParticipantID;
 
-if (!sessionID) {
+if (!sessionID || participantChanged) {
   sessionID = (crypto.randomUUID && crypto.randomUUID()) || `s_${Date.now()}`;
 }
 
+if (urlParticipantID) localStorage.setItem('participantID', participantID);
 localStorage.setItem('sessionID', sessionID);
 
 if (!participantID) {
