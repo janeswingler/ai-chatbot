@@ -695,6 +695,7 @@ async function handleSend() {
 function appendUserMessage(text) {
   const wrap = document.createElement('div');
   wrap.className = 'message message--user';
+  wrap.id = `msg-u-${++msgCounter}`;
   const bubble = document.createElement('div');
   bubble.className = 'message__bubble';
   const mathBlocks = [];
@@ -765,8 +766,8 @@ async function saveNote(content, isFormula = false, messageRef = null, title = '
         title,
         content,
         isFormula,
-        messageRef: null,
-        isHighlight: false
+        messageRef,
+        isHighlight: !!messageRef
       })
     });
     const note = await res.json();
@@ -969,6 +970,137 @@ function scrollChat() {
 if (userInput) {
   userInput.addEventListener('mouseover', () => logEvent('hover', 'User Input'));
   userInput.addEventListener('focus',     () => logEvent('focus', 'User Input'));
+}
+
+// ── Highlight-to-note selection flow ─────────────────────────────────────
+const selTooltip = document.getElementById('sel-tooltip');
+let selState = { text: '', msgId: null, isFormula: false };
+
+function normalizeSelectedText(text) {
+  if (!text) return '';
+  let out = String(text)
+    .replace(/[​-‍﻿]/g, '')
+    .replace(/ /g, ' ')
+    .replace(/`{1,3}/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  out = out
+    .replace(/^\$\$([\s\S]+)\$\$$/, '$1')
+    .replace(/^\$([\s\S]+)\$$/, '$1')
+    .replace(/^\\\(([\s\S]+)\\\)$/, '$1')
+    .replace(/^\\\[([\s\S]+)\\\]$/, '$1')
+    .trim();
+  return out;
+}
+
+function extractFormulaFromMathElement(mathEl) {
+  if (!mathEl) return '';
+  const ann = mathEl.querySelector('annotation[encoding="application/x-tex"]');
+  const tex = ann?.textContent?.trim();
+  if (tex) return normalizeSelectedText(tex);
+  const aria = mathEl.getAttribute('aria-label');
+  if (aria) return normalizeSelectedText(aria);
+  return normalizeSelectedText(mathEl.textContent || '');
+}
+
+function showSelectionTooltip(text, msgId, rect, isFormula = false) {
+  selState = { text, msgId, isFormula };
+  if (!selTooltip) return;
+  requestAnimationFrame(() => {
+    selTooltip.style.display = 'flex';
+    const x = rect.left + rect.width / 2 - selTooltip.offsetWidth / 2;
+    const y = rect.top - selTooltip.offsetHeight - 10;
+    selTooltip.style.left = Math.max(8, x) + 'px';
+    selTooltip.style.top = Math.max(8, y) + 'px';
+  });
+}
+
+function clearFormulaSelectionCue() {
+  messagesEl.querySelectorAll('.formula-selection-cue').forEach((el) => {
+    el.classList.remove('formula-selection-cue');
+  });
+}
+
+function cueFormulaSelection(formulaEl) {
+  if (!formulaEl) return;
+  clearFormulaSelectionCue();
+  formulaEl.classList.add('formula-selection-cue');
+  setTimeout(() => formulaEl.classList.remove('formula-selection-cue'), 1200);
+}
+
+function hideSelTooltip() {
+  if (selTooltip) selTooltip.style.display = 'none';
+  selState = { text: '', msgId: null, isFormula: false };
+  clearFormulaSelectionCue();
+}
+
+if (selTooltip) {
+  messagesEl.addEventListener('mouseup', (e) => {
+    const sel = window.getSelection();
+    if (!sel) { hideSelTooltip(); return; }
+
+    const baseNode = (sel.anchorNode?.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode) || e.target;
+    const formulaEl = baseNode?.closest?.('mjx-container');
+
+    if (sel.isCollapsed && formulaEl) {
+      const wrap = formulaEl.closest('.message--bot, .message--user');
+      if (!wrap) { hideSelTooltip(); return; }
+      const formulaText = extractFormulaFromMathElement(formulaEl);
+      if (!formulaText) { hideSelTooltip(); return; }
+      const rect = formulaEl.getBoundingClientRect();
+      cueFormulaSelection(formulaEl);
+      showSelectionTooltip(formulaText, wrap.id, rect, true);
+      return;
+    }
+
+    if (sel.isCollapsed) { hideSelTooltip(); return; }
+
+    const text = normalizeSelectedText(sel.toString());
+    if (!text) { hideSelTooltip(); return; }
+
+    const range = sel.getRangeAt(0);
+    const node = range.commonAncestorContainer;
+    const wrap = (node.nodeType === 3 ? node.parentElement : node).closest('.message--bot, .message--user');
+    if (!wrap) { hideSelTooltip(); return; }
+
+    const formulaNodes = [...wrap.querySelectorAll('mjx-container')].filter((el) => {
+      try { return range.intersectsNode(el); } catch { return false; }
+    });
+    if (formulaNodes.length) cueFormulaSelection(formulaNodes[0]);
+
+    const isFormula = formulaNodes.length > 0
+      || !!(sel.anchorNode?.parentElement?.closest?.('mjx-container') || sel.focusNode?.parentElement?.closest?.('mjx-container'));
+    showSelectionTooltip(text, wrap.id, range.getBoundingClientRect(), isFormula);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!selTooltip.contains(e.target)) hideSelTooltip();
+  });
+
+  selTooltip.addEventListener('mousedown', (e) => e.preventDefault());
+
+  selTooltip.addEventListener('click', async () => {
+    const { text, msgId, isFormula } = selState;
+    if (!text) return;
+    hideSelTooltip();
+    window.getSelection().removeAllRanges();
+    await saveNote(text, isFormula, msgId);
+  });
+}
+
+// ── Highlight feature notification banner ────────────────────────────────
+const highlightToast = document.getElementById('highlight-toast');
+const highlightToastClose = document.getElementById('highlight-toast-close');
+if (highlightToast) {
+  highlightToast.classList.add('is-visible');
+  highlightToastClose?.addEventListener('click', () => {
+    highlightToast.classList.remove('is-visible');
+  });
 }
 
 async function init() {

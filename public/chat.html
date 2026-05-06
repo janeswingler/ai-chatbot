@@ -37,6 +37,12 @@
     </div>
   </header>
 
+  <!-- Highlight feature notification -->
+  <div class="highlight-toast" id="highlight-toast" role="status">
+    <span class="highlight-toast__text">Tip: highlight any text in a message to save it to your notes.</span>
+    <button type="button" class="highlight-toast__close" id="highlight-toast-close" aria-label="Dismiss">×</button>
+  </div>
+
   <div class="app-shell">
 
     <!-- ══ CENTRE PANEL: Chat ══ -->
@@ -110,6 +116,12 @@
     </aside>
 
   </div><!-- /.app-shell -->
+
+  <!-- Selection highlight tooltip -->
+  <div class="sel-tooltip" id="sel-tooltip">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+    Save highlight
+  </div>
 
   <!-- Note composer window -->
   <div class="note-composer" id="note-composer" style="display:none" aria-hidden="true">
