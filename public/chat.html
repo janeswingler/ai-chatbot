@@ -37,6 +37,12 @@
     </div>
   </header>
 
+  <!-- Highlight feature notification -->
+  <div class="highlight-toast" id="highlight-toast" role="status">
+    <span class="highlight-toast__text">Tip: highlight any text in a message to save it to your notes.</span>
+    <button type="button" class="highlight-toast__close" id="highlight-toast-close" aria-label="Dismiss">×</button>
+  </div>
+
   <div class="app-shell">
 
     <!-- ══ CENTRE PANEL: Chat ══ -->
@@ -47,6 +53,21 @@
       <div class="typing-indicator" id="typing-indicator" style="display:none">
         <span></span><span></span><span></span>
       </div>
+
+      <!-- Input row -->
+      <form class="input-row" onsubmit="return false;" id="input-form">
+        <div class="input-body">
+          <div id="math-chips" class="math-chips" style="display:none"></div>
+          <label class="sr-only" for="user-input">Type a message</label>
+          <textarea id="user-input" rows="1" placeholder="Ask a question or type your working…" autocomplete="off"></textarea>
+        </div>
+        <div class="input-actions">
+          <button type="button" class="btn-ghost btn-minimise" id="math-toggle-btn" title="Minimise math panel">
+            <svg id="math-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button type="submit" class="btn-primary" id="send-btn">Send</button>
+        </div>
+      </form>
 
       <!-- Math panel (field + symbol shortcuts, one unified panel) -->
       <div class="math-panel" id="math-panel">
@@ -79,21 +100,6 @@
           <button class="sym-btn" data-cmd="deleteBackward" title="Backspace">⌫</button>
         </div>
       </div>
-
-      <!-- Input row -->
-      <form class="input-row" onsubmit="return false;" id="input-form">
-        <div class="input-body">
-          <div id="math-chips" class="math-chips" style="display:none"></div>
-          <label class="sr-only" for="user-input">Type a message</label>
-          <textarea id="user-input" rows="1" placeholder="Ask a question or type your working…" autocomplete="off"></textarea>
-        </div>
-        <div class="input-actions">
-          <button type="button" class="btn-ghost btn-minimise" id="math-toggle-btn" title="Minimise math panel">
-            <svg id="math-toggle-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-          </button>
-          <button type="submit" class="btn-primary" id="send-btn">Send</button>
-        </div>
-      </form>
     </main>
 
     <div class="col-resizer" id="resizer-right" title="Drag to resize"></div>
@@ -110,6 +116,12 @@
     </aside>
 
   </div><!-- /.app-shell -->
+
+  <!-- Selection highlight tooltip -->
+  <div class="sel-tooltip" id="sel-tooltip">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+    Save highlight
+  </div>
 
   <!-- Note composer window -->
   <div class="note-composer" id="note-composer" style="display:none" aria-hidden="true">

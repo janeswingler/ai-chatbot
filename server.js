@@ -147,9 +147,11 @@ app.post('/chat', async (req, res) => {
       chunkCount: chunks.length
     };
 
+    const conciseDirective = `Keep responses concise: aim for roughly 120 words or fewer, prioritize the most important point first, and always finish your final sentence. Your reply is hard-capped at 200 tokens, so plan the full answer to fit within that budget rather than trailing off.`;
+
     const systemPrompt = chunks.length > 0
-      ? `You are a helpful assistant. Use the following retrieved context to answer the user's question. Base your answer on this evidence.\n\nContext:\n${chunks.map((c, i) => `[${i + 1}] ${c.chunkText}`).join('\n\n')}`
-      : `You are a helpful assistant. No relevant documents were found; answer from general knowledge.`;
+      ? `You are a helpful assistant. ${conciseDirective} Use the following retrieved context to answer the user's question. Base your answer on this evidence.\n\nContext:\n${chunks.map((c, i) => `[${i + 1}] ${c.chunkText}`).join('\n\n')}`
+      : `You are a helpful assistant. ${conciseDirective} No relevant documents were found; answer from general knowledge.`;
 
     const safeHistory = Array.isArray(history)
       ? history
