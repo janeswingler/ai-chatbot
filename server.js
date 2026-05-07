@@ -120,6 +120,20 @@ app.post('/practice-event', async (req, res) => {
     const payload = req.body;
     if (payload && payload.attempt && payload.attempt.participantID) {
       const a = payload.attempt;
+      function parseDateLike(v) {
+        if (!v) return undefined;
+        const n = Number(v);
+        if (!Number.isNaN(n)) {
+          const d = new Date(n);
+          return isNaN(d.getTime()) ? undefined : d;
+        }
+        const d2 = new Date(v);
+        return isNaN(d2.getTime()) ? undefined : d2;
+      }
+
+      const startedAtDate = parseDateLike(a.startedAt);
+      const computedLatency = startedAtDate ? (Date.now() - startedAtDate.getTime()) : undefined;
+
       const attempt = new PracticeAttempt({
         participantID: a.participantID,
         systemID: a.systemID || null,
@@ -133,38 +147,55 @@ app.post('/practice-event', async (req, res) => {
         studentAnswerRaw: a.studentAnswerRaw || null,
         isCorrect: !!a.isCorrect,
         actionType: a.actionType || 'submit',
-        startedAt: a.startedAt ? new Date(a.startedAt) : undefined,
-        submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(),
-        latencyMs: typeof a.latencyMs === 'number' ? a.latencyMs : undefined,
+        startedAt: startedAtDate,
+        submittedAt: a.submittedAt ? parseDateLike(a.submittedAt) : new Date(),
+        latencyMs: typeof computedLatency === 'number' && Number.isFinite(computedLatency) ? computedLatency : (typeof a.latencyMs === 'number' ? a.latencyMs : undefined),
         meta: a.meta || null
       });
       await attempt.save();
       return res.json({ ok: true });
     }
     if (Array.isArray(payload.attempts)) {
-      await PracticeAttempt.insertMany(payload.attempts.map(a => ({
-        participantID: a.participantID,
-        systemID: a.systemID || null,
-        sessionID: a.sessionID || null,
-        practiceId: a.practiceId || null,
-        topic: a.topic || null,
-        problemHash: a.problemHash || null,
-        stepIndex: typeof a.stepIndex === 'number' ? a.stepIndex : null,
-        stepInstruction: a.stepInstruction || null,
-        expectedAnswer: a.expectedAnswer || null,
-        studentAnswerRaw: a.studentAnswerRaw || null,
-        isCorrect: !!a.isCorrect,
-        actionType: a.actionType || 'submit',
-        startedAt: a.startedAt ? new Date(a.startedAt) : undefined,
-        submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(),
-        latencyMs: typeof a.latencyMs === 'number' ? a.latencyMs : undefined,
-        meta: a.meta || null
-      })));
+      function parseDateLike(v) {
+        if (!v) return undefined;
+        const n = Number(v);
+        if (!Number.isNaN(n)) {
+          const d = new Date(n);
+          return isNaN(d.getTime()) ? undefined : d;
+        }
+        const d2 = new Date(v);
+        return isNaN(d2.getTime()) ? undefined : d2;
+      }
+
+      await PracticeAttempt.insertMany(payload.attempts.map(a => {
+        const startedAtDate = parseDateLike(a.startedAt);
+        const computedLatency = startedAtDate ? (Date.now() - startedAtDate.getTime()) : undefined;
+        return {
+          participantID: a.participantID,
+          systemID: a.systemID || null,
+          sessionID: a.sessionID || null,
+          practiceId: a.practiceId || null,
+          topic: a.topic || null,
+          problemHash: a.problemHash || null,
+          stepIndex: typeof a.stepIndex === 'number' ? a.stepIndex : null,
+          stepInstruction: a.stepInstruction || null,
+          expectedAnswer: a.expectedAnswer || null,
+          studentAnswerRaw: a.studentAnswerRaw || null,
+          isCorrect: !!a.isCorrect,
+          actionType: a.actionType || 'submit',
+          startedAt: startedAtDate,
+          submittedAt: a.submittedAt ? parseDateLike(a.submittedAt) : new Date(),
+          latencyMs: typeof computedLatency === 'number' && Number.isFinite(computedLatency) ? computedLatency : (typeof a.latencyMs === 'number' ? a.latencyMs : undefined),
+          meta: a.meta || null
+        };
+      }));
       return res.json({ ok: true, count: payload.attempts.length });
     }
     res.status(400).json({ error: 'No attempt payload provided' });
   } catch (err) {
     console.error('practice-event error:', err?.message || err);
+    try { console.error('practice-event payload:', JSON.stringify(req.body)); } catch(e) {}
+    console.error(err?.stack || err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -184,6 +215,32 @@ app.post('/topic-event', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Diagnostic telemetry status endpoint (admin/debug)
+app.get('/telemetry-status', async (req, res) => {
+  try {
+    const [evCount, paCount, tpCount, ssCount, intCount, noteCount] = await Promise.all([
+      EventLog.countDocuments(),
+      PracticeAttempt.countDocuments(),
+      TopicPlanEvent.countDocuments(),
+      StudySession.countDocuments(),
+      Interaction.countDocuments(),
+      Note.countDocuments()
+    ]);
+
+    const latest = {
+      eventLog: await EventLog.findOne().sort({ timestamp: -1 }).lean().exec(),
+      practiceAttempt: await PracticeAttempt.findOne().sort({ createdAt: -1 }).lean().exec(),
+      topicPlanEvent: await TopicPlanEvent.findOne().sort({ timestamp: -1 }).lean().exec(),
+      studySession: await StudySession.findOne().sort({ startedAt: -1 }).lean().exec()
+    };
+
+    res.json({ counts: { eventlogs: evCount, practiceattempts: paCount, topicplanevents: tpCount, studysessions: ssCount, interactions: intCount, notes: noteCount }, latest });
+  } catch (err) {
+    console.error('telemetry-status error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/history', async (req, res) => {
