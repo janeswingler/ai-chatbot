@@ -487,6 +487,8 @@ async function submitQuiz() {
   const quizStartedAt = quizStartTime ? quizStartTime.toISOString() : new Date().toISOString();
   const quizSubmittedAt = new Date().toISOString();
 
+  console.log('Submitting quiz with answers:', answers);
+
   try {
     const res = await fetch('/submit-quiz', {
       method: 'POST',

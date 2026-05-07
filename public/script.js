@@ -22,7 +22,17 @@ function logEvent(type, element) {
   fetch('/log-event', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantID, systemID, sessionID, eventType: type, elementName: element, timestamp: new Date() })
+    body: JSON.stringify({
+      participantID,
+      systemID,
+      sessionID,
+      eventType: type,
+      elementName: element,
+      eventProps: null,
+      clientTs: new Date(),
+      page: window.location.pathname,
+      uiVersion: window.__uiVersion || null
+    })
   }).catch(() => {});
 }
 

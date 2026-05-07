@@ -28,6 +28,8 @@ const StudySession = require('./models/StudySession');
 const retrievalService = require('./services/retrievalService');
 retrievalService.initialize().catch(err => console.error('Failed to initialize retrieval service:', err));
 const EventLog = require('./models/EventLog');
+const PracticeAttempt = require('./models/PracticeAttempt');
+const TopicPlanEvent = require('./models/TopicPlanEvent');
 const Document = require('./models/Document');
 const documentProcessor = require("./services/documentProcessor");
 const embeddingService = require("./services/embeddingService");
@@ -92,15 +94,91 @@ app.post('/submit-prompt', async (req, res) => {
 });
 
 app.post('/log-event', async (req, res) => {
-  const { participantID, systemID, sessionID, eventType, elementName, timestamp } = req.body;
+  const { participantID, systemID, sessionID, eventType, elementName, eventProps, clientTs, page, uiVersion } = req.body;
   try {
-    // Log the event to MongoDB
-    const event = new EventLog({ participantID, systemID: systemID || null, sessionID: sessionID || null, eventType, elementName, timestamp });
+    const event = new EventLog({
+      participantID,
+      systemID: systemID || null,
+      sessionID: sessionID || null,
+      eventType,
+      elementName,
+      eventProps: eventProps || null,
+      clientTs: clientTs ? new Date(clientTs) : undefined,
+      page: page || null,
+      uiVersion: uiVersion || null
+    });
     await event.save();
     res.status(200).send('Event logged successfully');
   } catch (error) {
     console.error('Error logging event:', error.message);
     res.status(500).send('Server Error');
+  }
+});
+
+app.post('/practice-event', async (req, res) => {
+  try {
+    const payload = req.body;
+    if (payload && payload.attempt && payload.attempt.participantID) {
+      const a = payload.attempt;
+      const attempt = new PracticeAttempt({
+        participantID: a.participantID,
+        systemID: a.systemID || null,
+        sessionID: a.sessionID || null,
+        practiceId: a.practiceId || null,
+        topic: a.topic || null,
+        problemHash: a.problemHash || null,
+        stepIndex: typeof a.stepIndex === 'number' ? a.stepIndex : null,
+        stepInstruction: a.stepInstruction || null,
+        expectedAnswer: a.expectedAnswer || null,
+        studentAnswerRaw: a.studentAnswerRaw || null,
+        isCorrect: !!a.isCorrect,
+        actionType: a.actionType || 'submit',
+        startedAt: a.startedAt ? new Date(a.startedAt) : undefined,
+        submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(),
+        latencyMs: typeof a.latencyMs === 'number' ? a.latencyMs : undefined,
+        meta: a.meta || null
+      });
+      await attempt.save();
+      return res.json({ ok: true });
+    }
+    if (Array.isArray(payload.attempts)) {
+      await PracticeAttempt.insertMany(payload.attempts.map(a => ({
+        participantID: a.participantID,
+        systemID: a.systemID || null,
+        sessionID: a.sessionID || null,
+        practiceId: a.practiceId || null,
+        topic: a.topic || null,
+        problemHash: a.problemHash || null,
+        stepIndex: typeof a.stepIndex === 'number' ? a.stepIndex : null,
+        stepInstruction: a.stepInstruction || null,
+        expectedAnswer: a.expectedAnswer || null,
+        studentAnswerRaw: a.studentAnswerRaw || null,
+        isCorrect: !!a.isCorrect,
+        actionType: a.actionType || 'submit',
+        startedAt: a.startedAt ? new Date(a.startedAt) : undefined,
+        submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(),
+        latencyMs: typeof a.latencyMs === 'number' ? a.latencyMs : undefined,
+        meta: a.meta || null
+      })));
+      return res.json({ ok: true, count: payload.attempts.length });
+    }
+    res.status(400).json({ error: 'No attempt payload provided' });
+  } catch (err) {
+    console.error('practice-event error:', err?.message || err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/topic-event', async (req, res) => {
+  try {
+    const { participantID, systemID, sessionID, topicId, topicName, eventName, oldValue, newValue, meta } = req.body;
+    if (!participantID || !eventName) return res.status(400).json({ error: 'Missing fields' });
+    const ev = new TopicPlanEvent({ participantID, systemID: systemID || null, sessionID: sessionID || null, topicId: topicId || null, topicName: topicName || null, eventName, oldValue: oldValue || null, newValue: newValue || null, meta: meta || null });
+    await ev.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('topic-event error:', err?.message || err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -273,6 +351,8 @@ app.post('/submit-quiz', async (req, res) => {
   const { participantID, systemID, sessionID, answers, tabSwitchCount, tabSwitches, timeSpent, startedAt, completedAt } = req.body;
 
   try {
+    console.log('Quiz submission received - Answers:', JSON.stringify(answers));
+    
     const quizStartedAt = startedAt ? new Date(startedAt) : new Date();
     const quizSubmittedAt = completedAt ? new Date(completedAt) : new Date();
 
@@ -303,6 +383,8 @@ app.post('/submit-quiz', async (req, res) => {
       .filter(Boolean)
       .sort((a, b) => a.questionNumber - b.questionNumber);
 
+    console.log('Transformed responses:', JSON.stringify(responses));
+
     await QuizResponse.create({
       participantID,
       systemID,
@@ -316,6 +398,22 @@ app.post('/submit-quiz', async (req, res) => {
   } catch (error) {
     console.error('Error submitting quiz:', error);
     res.status(500).json({ error: 'Failed to submit quiz' });
+  }
+});
+
+// GET quiz responses for a participant
+app.get('/quiz-responses', async (req, res) => {
+  try {
+    const { participantID, sessionID } = req.query;
+    const query = {};
+    if (participantID) query.participantID = participantID;
+    if (sessionID) query.sessionID = sessionID;
+    
+    const quizResponses = await QuizResponse.find(query).populate('quizId');
+    res.status(200).json(quizResponses);
+  } catch (error) {
+    console.error('Error retrieving quiz responses:', error);
+    res.status(500).json({ error: 'Failed to retrieve quiz responses' });
   }
 });
 
@@ -362,6 +460,28 @@ app.post('/study-session/end', async (req, res) => {
     session.durationSec = Math.max(0, Math.round((endTime - session.startedAt) / 1000));
     session.met20MinMinimum = session.durationSec >= 20 * 60;
     await session.save();
+
+    // Compute lightweight session summary metrics for analysis
+    try {
+      const [chatTurns, practiceSubmissions, notesCount, eventsCount, topicEventsCount] = await Promise.all([
+        Interaction.countDocuments({ sessionID }),
+        PracticeAttempt.countDocuments({ sessionID }),
+        Note.countDocuments({ sessionID }),
+        EventLog.countDocuments({ sessionID }),
+        TopicPlanEvent.countDocuments({ sessionID })
+      ]);
+
+      session.summary = {
+        totalChatTurns: chatTurns,
+        totalPracticeSubmissions: practiceSubmissions,
+        totalNotesCreated: notesCount,
+        totalEvents: eventsCount,
+        totalTopicEvents: topicEventsCount
+      };
+      await session.save();
+    } catch (err) {
+      console.error('Failed to compute session summary:', err?.message || err);
+    }
 
     res.json(session);
   } catch (error) {
