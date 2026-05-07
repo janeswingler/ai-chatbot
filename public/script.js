@@ -137,7 +137,7 @@ if (postTaskBtn) postTaskBtn.addEventListener('click', () => redirectToQualtrics
 
 if (document.getElementById('messages')) {
 
-const SESSION_UNLOCK_SECONDS = 10;
+const SESSION_UNLOCK_SECONDS = 15 * 60;
 const timerEl = document.getElementById('topbar-timer');
 const returnBtn = document.getElementById('topbar-return');
 const sessionStart = Date.now();
